@@ -1,0 +1,10 @@
+quart
+supabase
+python-dotenv
+resend
+faker
+reportlab
+pyjwt
+cryptography
+python-multipart
+quart-cors

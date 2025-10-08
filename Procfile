@@ -1,1 +1,1 @@
-web: quart run --host 0.0.0.0 --port $PORT
+web: granian --interface asgi app:app --host 0.0.0.0 --port $PORT --workers 2

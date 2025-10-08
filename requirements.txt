@@ -8,3 +8,4 @@ pyjwt
 cryptography
 python-multipart
 quart-cors
+granian

@@ -31,3 +31,6 @@ RESEND_API_KEY = os.getenv('RESEND_API_KEY')
 
 # CORS Configuration
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+# Logging Configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG').upper()  # DEBUG, INFO, WARNING, ERROR, CRITICAL

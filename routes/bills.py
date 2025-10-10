@@ -64,6 +64,7 @@ async def pay_bill(user, bill_id):
 	
 	# Create payment record
 	payment_data = {
+		'user_id': user['user_id'],
 		'bill_id': bill_id,
 		'account_id': data['account_id'],
 		'amount': float(data['amount']),

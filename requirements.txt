@@ -1,10 +1,10 @@
-quart==0.19.4
-supabase==2.0.3
-python-dotenv==1.0.0
-pyjwt==2.8.0
-resend==0.7.0
-hypercorn==0.16.0
-httpx==0.24.1
+quart
+supabase
+python-dotenv
+pyjwt
+resend
+hypercorn
+httpx
 reportlab
 pyjwt
 cryptography

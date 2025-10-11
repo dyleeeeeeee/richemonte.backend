@@ -7,7 +7,7 @@ from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
 from auth import require_auth
-from services import send_email, log_notification, get_user_email
+from services import notify_user
 from templates import check_deposit_email, check_order_email
 
 logger = logging.getLogger(__name__)
@@ -40,12 +40,16 @@ async def deposit_check(user):
 	
 	result = supabase.table('checks').insert(check_data).execute()
 	
-	# Send confirmation email
-	email = await get_user_email(supabase, user['user_id'])
-	if email:
-		html = check_deposit_email(float(data['amount']), data.get('check_number', 'N/A'))
-		await send_email(email, 'Check Deposit Confirmation', html)
-		await log_notification(supabase, user['user_id'], 'check_deposit', f'Check deposit of ${float(data["amount"]):,.2f}')
+	# Send notification
+	html = check_deposit_email(float(data['amount']), data.get('check_number', 'N/A'))
+	await notify_user(
+		supabase,
+		user['user_id'],
+		'check_deposit',
+		f'Check deposit of ${float(data["amount"]):,.2f}',
+		'Check Deposit Confirmation',
+		html
+	)
 	
 	logger.info(f"Check deposited for user {user['user_id']}: ${float(data['amount']):.2f}")
 	return jsonify(result.data[0]), 201
@@ -69,16 +73,20 @@ async def order_checks(user):
 	
 	result = supabase.table('check_orders').insert(order_data).execute()
 	
-	# Send confirmation email
-	email = await get_user_email(supabase, user['user_id'])
-	if email:
-		html = check_order_email(
-			data.get('design', 'Standard'),
-			int(data.get('quantity', 50)),
-			float(data.get('price', 29.99))
-		)
-		await send_email(email, 'Check Order Confirmation', html)
-		await log_notification(supabase, user['user_id'], 'check_order', f'Check order placed: {data.get("design")}')
+	# Send notification
+	html = check_order_email(
+		data.get('design', 'Standard'),
+		int(data.get('quantity', 50)),
+		float(data.get('price', 29.99))
+	)
+	await notify_user(
+		supabase,
+		user['user_id'],
+		'check_order',
+		f'Check order placed: {data.get("design")}',
+		'Check Order Confirmation',
+		html
+	)
 	
 	logger.info(f"Check order placed for user {user['user_id']}: {data.get('design')}")
 	return jsonify(result.data[0]), 201

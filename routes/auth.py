@@ -1,35 +1,41 @@
 """
 Authentication routes for Concierge Bank
 """
-import logging
 from datetime import datetime
+from utils.recaptcha import verify_recaptcha
 from quart import Blueprint, request, jsonify, make_response
 
 from core import get_supabase_client
-from core.config import JWT_EXPIRATION_HOURS
+from core.config import JWT_EXPIRATION_HOURS, SUPABASE_URL, SUPABASE_KEY
 from auth import create_jwt_token, require_auth
-from services import send_email, log_notification
-from templates import welcome_email
-
-logger = logging.getLogger(__name__)
-auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
-supabase = get_supabase_client()
+from supabase import create_client, Client
 
 
 @auth_bp.route('/register', methods=['POST'])
 async def register():
-	"""Register new user"""
-	data = await request.get_json()
-	
-	try:
-		# Create user in Supabase Auth
-		auth_response = supabase.auth.sign_up({
+    """Register new user with anti-bot protection"""
+    data = await request.get_json()
+    
+    try:
+        # Verify reCAPTCHA token (anti-bot)
+        recaptcha_token = data.get('recaptcha_token')
+        if recaptcha_token:
+            success, score, error = await verify_recaptcha(recaptcha_token, 'register')
+            if not success:
+                logger.warning(f"Bot registration attempt blocked: {error}")
+                return jsonify({'error': 'Registration failed. Please try again.'}), 403
+            logger.info(f"reCAPTCHA passed: score={score}")
+        else:
+            logger.warning("Registration without reCAPTCHA token")
+        
+        # Get Supabase client
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        auth_response = supabase.auth.sign_up({
 			'email': data['email'],
 			'password': data['password']
 		})
 		
 		if not auth_response.user:
-			return jsonify({'error': 'Registration failed'}), 400
 		
 		# Create user profile in users table
 		profile_data = {
@@ -44,10 +50,16 @@ async def register():
 		
 		supabase.table('users').insert(profile_data).execute()
 		
-		# Send welcome email
+		# Send welcome notification
 		html = welcome_email(data.get('full_name', ''))
-		await send_email(data['email'], 'Welcome to Concierge Bank', html)
-		await log_notification(supabase, auth_response.user.id, 'registration', 'Welcome email sent')
+		await notify_user(
+			supabase,
+			auth_response.user.id,
+			'registration',
+			'Welcome email sent',
+			'Welcome to Concierge Bank',
+			html
+		)
 		
 		# Create JWT token
 		token = create_jwt_token(auth_response.user.id, data['email'])

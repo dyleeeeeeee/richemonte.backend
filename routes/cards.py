@@ -9,7 +9,7 @@ from core import get_supabase_client
 from core.config import CARD_EXPIRY_DAYS
 from auth import require_auth
 from utils import generate_card_number, generate_cvv
-from services import send_email, log_notification, get_user_email
+from services import notify_user
 from templates import card_approved_email
 
 logger = logging.getLogger(__name__)
@@ -49,17 +49,21 @@ async def apply_card(user):
 	
 	result = supabase.table('cards').insert(card_data).execute()
 	
-	# Send approval email
-	email = await get_user_email(supabase, user['user_id'])
-	if email:
-		html = card_approved_email(
-			data.get('card_brand', 'Cartier'),
-			data['card_type'],
-			card_number[-4:],
-			float(data.get('credit_limit', 10000))
-		)
-		await send_email(email, 'Card Application Approved', html)
-		await log_notification(supabase, user['user_id'], 'card_approved', f'{data["card_type"]} card approved')
+	# Send notification
+	html = card_approved_email(
+		data.get('card_brand', 'Cartier'),
+		data['card_type'],
+		card_number[-4:],
+		float(data.get('credit_limit', 10000))
+	)
+	await notify_user(
+		supabase,
+		user['user_id'],
+		'card_approved',
+		f'{data["card_type"]} card approved',
+		'Card Application Approved',
+		html
+	)
 	
 	logger.info(f"Card approved for user {user['user_id']}: ****{card_number[-4:]}")
 	return jsonify(result.data[0]), 201

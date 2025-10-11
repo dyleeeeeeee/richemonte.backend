@@ -8,7 +8,7 @@ from quart import Blueprint, request, jsonify
 from core import get_supabase_client
 from auth import require_auth
 from utils import generate_account_number
-from services import send_email, log_notification, get_user_email
+from services import notify_user
 from templates import account_created_email
 
 logger = logging.getLogger(__name__)
@@ -44,16 +44,20 @@ async def create_account(user):
 	
 	result = supabase.table('accounts').insert(account_data).execute()
 	
-	# Send confirmation email
-	email = await get_user_email(supabase, user['user_id'])
-	if email:
-		html = account_created_email(
-			data['account_type'],
-			account_number,
-			float(data.get('initial_deposit', 0))
-		)
-		await send_email(email, 'New Account Confirmation', html)
-		await log_notification(supabase, user['user_id'], 'account_created', f'New {data["account_type"]} account created')
+	# Send notification
+	html = account_created_email(
+		data['account_type'],
+		account_number,
+		float(data.get('initial_deposit', 0))
+	)
+	await notify_user(
+		supabase,
+		user['user_id'],
+		'account_created',
+		f'New {data["account_type"]} account created',
+		'New Account Confirmation',
+		html
+	)
 	
 	logger.info(f"Account created for user {user['user_id']}: {account_number}")
 	return jsonify(result.data[0]), 201

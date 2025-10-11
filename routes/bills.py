@@ -7,7 +7,8 @@ from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
 from auth import require_auth
-from services import send_email, log_notification, get_user_email
+from utils import verify_account_ownership, check_sufficient_balance, update_account_balance, insert_record
+from services import notify_user
 from templates import bill_payment_email
 
 logger = logging.getLogger(__name__)
@@ -55,12 +56,13 @@ async def pay_bill(user, bill_id):
 		return jsonify({'error': 'Bill not found'}), 404
 	
 	# Verify account ownership and balance
-	account = supabase.table('accounts').select('*').eq('id', data['account_id']).eq('user_id', user['user_id']).single().execute()
-	if not account.data:
-		return jsonify({'error': 'Invalid account'}), 400
+	success, account_data, error = await verify_account_ownership(supabase, data['account_id'], user['user_id'])
+	if not success:
+		return jsonify({'error': error}), 400
 	
-	if account.data['balance'] < float(data['amount']):
-		return jsonify({'error': 'Insufficient funds'}), 400
+	has_balance, balance_error = await check_sufficient_balance(account_data, float(data['amount']))
+	if not has_balance:
+		return jsonify({'error': balance_error}), 400
 	
 	# Create payment record
 	payment_data = {
@@ -76,19 +78,23 @@ async def pay_bill(user, bill_id):
 	result = supabase.table('bill_payments').insert(payment_data).execute()
 	
 	# Update account balance
-	new_balance = account.data['balance'] - float(data['amount'])
-	supabase.table('accounts').update({'balance': new_balance}).eq('id', data['account_id']).execute()
+	new_balance = account_data['balance'] - float(data['amount'])
+	await update_account_balance(supabase, data['account_id'], new_balance)
 	
-	# Send confirmation email
-	email = await get_user_email(supabase, user['user_id'])
-	if email:
-		html = bill_payment_email(
-			bill.data['payee_name'],
-			float(data['amount']),
-			data.get('payment_date', datetime.utcnow().strftime('%Y-%m-%d'))
-		)
-		await send_email(email, 'Bill Payment Confirmation', html)
-		await log_notification(supabase, user['user_id'], 'bill_payment', f'Payment to {bill.data["payee_name"]} completed')
+	# Send notification
+	html = bill_payment_email(
+		bill.data['payee_name'],
+		float(data['amount']),
+		data.get('payment_date', datetime.utcnow().strftime('%Y-%m-%d'))
+	)
+	await notify_user(
+		supabase,
+		user['user_id'],
+		'bill_payment',
+		f'Payment to {bill.data["payee_name"]} completed',
+		'Bill Payment Confirmation',
+		html
+	)
 	
 	logger.info(f"Bill payment completed for user {user['user_id']}: {bill.data['payee_name']}")
 	return jsonify(result.data[0]), 201

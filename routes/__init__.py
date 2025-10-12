@@ -9,6 +9,7 @@ from .bills import bills_bp
 from .checks import checks_bp
 from .notifications import notifications_bp
 from .settings import settings_bp
+from .beneficiaries import beneficiaries_bp
 from .health import health_bp
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
 	'checks_bp',
 	'notifications_bp',
 	'settings_bp',
+	'beneficiaries_bp',
 	'health_bp',
 ]

@@ -139,6 +139,19 @@ CREATE TABLE IF NOT EXISTS notifications (
 	created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Beneficiaries table
+CREATE TABLE IF NOT EXISTS beneficiaries (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+	full_name TEXT NOT NULL,
+	relationship TEXT NOT NULL,
+	email TEXT,
+	phone TEXT,
+	percentage DECIMAL(5, 2) NOT NULL,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_cards_user_id ON cards(user_id);
@@ -148,6 +161,7 @@ CREATE INDEX IF NOT EXISTS idx_transfers_user_id ON transfers(user_id);
 CREATE INDEX IF NOT EXISTS idx_bills_user_id ON bills(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_beneficiaries_user_id ON beneficiaries(user_id);
 
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -161,6 +175,7 @@ ALTER TABLE checks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE check_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE statements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE beneficiaries ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (users can only access their own data)
 CREATE POLICY "Users can view own data" ON users FOR SELECT USING (auth.uid() = id);
@@ -201,3 +216,6 @@ CREATE POLICY "Users can view own statements" ON statements FOR SELECT USING (au
 
 CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own beneficiaries" ON beneficiaries FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own beneficiaries" ON beneficiaries FOR ALL USING (auth.uid() = user_id);

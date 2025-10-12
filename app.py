@@ -18,6 +18,7 @@ from routes import (
 	checks_bp,
 	notifications_bp,
 	settings_bp,
+	beneficiaries_bp,
 	health_bp
 )
 
@@ -104,6 +105,8 @@ def create_app():
 	logger.debug("  ✓ notifications_bp registered")
 	app.register_blueprint(settings_bp)
 	logger.debug("  ✓ settings_bp registered")
+	app.register_blueprint(beneficiaries_bp)
+	logger.debug("  ✓ beneficiaries_bp registered")
 	app.register_blueprint(health_bp)
 	logger.debug("  ✓ health_bp registered")
 	

@@ -11,6 +11,7 @@ from .notifications import notifications_bp
 from .settings import settings_bp
 from .beneficiaries import beneficiaries_bp
 from .health import health_bp
+from .admin import admin_bp
 
 __all__ = [
 	'auth_bp',
@@ -23,4 +24,5 @@ __all__ = [
 	'settings_bp',
 	'beneficiaries_bp',
 	'health_bp',
+	'admin_bp',
 ]

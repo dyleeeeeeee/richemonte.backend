@@ -1,0 +1,170 @@
+"""
+Admin routes for Concierge Bank - Superuser operations
+"""
+import logging
+from datetime import datetime
+from quart import Blueprint, request, jsonify
+
+from core import get_supabase_client
+from auth import require_auth
+from utils import verify_account_ownership, update_account_balance, insert_record
+from services import notify_user
+from templates import bill_payment_email
+
+logger = logging.getLogger(__name__)
+admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+supabase = get_supabase_client()
+
+
+def require_admin(user):
+    """Decorator to ensure user is admin"""
+    if user.get('role') != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    return None
+
+
+@admin_bp.route('/users', methods=['GET'])
+@require_auth
+async def get_all_users(user):
+    """Get all users (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    users = supabase.table('users').select('*').execute()
+    return jsonify(users.data)
+
+
+@admin_bp.route('/users/<user_id>', methods=['PUT'])
+@require_auth
+async def update_user(user, user_id):
+    """Update user details (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    data = await request.get_json()
+
+    # Only allow updating certain fields
+    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role']
+    update_data = {k: v for k, v in data.items() if k in allowed_fields}
+
+    result = supabase.table('users').update(update_data).eq('id', user_id).execute()
+    logger.info(f"User {user_id} updated by admin {user['user_id']}")
+    return jsonify(result.data[0])
+
+
+@admin_bp.route('/accounts', methods=['GET'])
+@require_auth
+async def get_all_accounts(user):
+    """Get all accounts (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    accounts = supabase.table('accounts').select('*, users(full_name, email)').execute()
+    return jsonify(accounts.data)
+
+
+@admin_bp.route('/accounts/<account_id>/balance', methods=['PUT'])
+@require_auth
+async def update_account_balance_admin(user, account_id):
+    """Update account balance (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    data = await request.get_json()
+    new_balance = float(data['balance'])
+
+    result = supabase.table('accounts').update({
+        'balance': new_balance,
+        'updated_at': datetime.utcnow().isoformat()
+    }).eq('id', account_id).execute()
+
+    logger.info(f"Account {account_id} balance updated to {new_balance} by admin {user['user_id']}")
+    return jsonify(result.data[0])
+
+
+@admin_bp.route('/bills/create', methods=['POST'])
+@require_auth
+async def create_bill_for_user(user):
+    """Create bill for specific user (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    data = await request.get_json()
+
+    bill_data = {
+        'user_id': data['user_id'],
+        'payee_name': data['payee_name'],
+        'account_number': data.get('account_number', ''),
+        'bill_type': data.get('bill_type', 'utility'),
+        'amount': float(data['amount']),
+        'due_date': data['due_date'],
+        'auto_pay': data.get('auto_pay', False),
+        'created_at': datetime.utcnow().isoformat()
+    }
+
+    result = supabase.table('bills').insert(bill_data).execute()
+    logger.info(f"Bill created for user {data['user_id']} by admin {user['user_id']}: {data['payee_name']}")
+    return jsonify(result.data[0]), 201
+
+
+@admin_bp.route('/notifications/send', methods=['POST'])
+@require_auth
+async def send_notification_to_user(user):
+    """Send notification to specific user (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    data = await request.get_json()
+
+    notification_data = {
+        'user_id': data['user_id'],
+        'type': data.get('type', 'admin_message'),
+        'title': data['title'],
+        'message': data['message'],
+        'delivery_method': data.get('delivery_method', 'push'),
+        'read': False,
+        'created_at': datetime.utcnow().isoformat()
+    }
+
+    result = supabase.table('notifications').insert(notification_data).execute()
+
+    # Send email notification if requested
+    if data.get('send_email', False):
+        # Here you would implement email sending logic
+        logger.info(f"Email notification sent to user {data['user_id']} by admin {user['user_id']}")
+
+    logger.info(f"Notification sent to user {data['user_id']} by admin {user['user_id']}: {data['title']}")
+    return jsonify(result.data[0]), 201
+
+
+@admin_bp.route('/stats', methods=['GET'])
+@require_auth
+async def get_admin_stats(user):
+    """Get admin dashboard statistics"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    # Get various stats
+    users_count = supabase.table('users').select('id', count='exact').execute()
+    accounts_count = supabase.table('accounts').select('id', count='exact').execute()
+    total_balance = supabase.table('accounts').select('balance').execute()
+    bills_count = supabase.table('bills').select('id', count='exact').execute()
+
+    # Calculate total balance
+    total_balance_value = sum(account['balance'] for account in total_balance.data) if total_balance.data else 0
+
+    stats = {
+        'total_users': len(users_count.data) if users_count.data else 0,
+        'total_accounts': len(accounts_count.data) if accounts_count.data else 0,
+        'total_balance': total_balance_value,
+        'total_bills': len(bills_count.data) if bills_count.data else 0,
+    }
+
+    return jsonify(stats)

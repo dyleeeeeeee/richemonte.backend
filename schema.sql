@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
 	photo_url TEXT,
 	preferred_brand TEXT DEFAULT 'Cartier',
 	notification_preferences JSONB DEFAULT '{"email": true, "sms": false, "push": true}'::jsonb,
+	role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user')),
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -76,6 +77,8 @@ CREATE TABLE IF NOT EXISTS bills (
 	payee_name TEXT NOT NULL,
 	account_number TEXT,
 	bill_type TEXT, -- utility, telecom, credit_card, insurance
+	amount DECIMAL(15, 2) NOT NULL,
+	due_date DATE NOT NULL,
 	auto_pay BOOLEAN DEFAULT FALSE,
 	created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -176,46 +179,3 @@ ALTER TABLE check_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE statements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE beneficiaries ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies (users can only access their own data)
-CREATE POLICY "Users can view own data" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can insert own data" ON users FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Users can update own data" ON users FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Users can view own accounts" ON accounts FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own accounts" ON accounts FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own accounts" ON accounts FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own cards" ON cards FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own cards" ON cards FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own cards" ON cards FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own transactions" ON transactions FOR SELECT USING (
-	EXISTS (SELECT 1 FROM accounts WHERE accounts.id = transactions.account_id AND accounts.user_id = auth.uid())
-);
-CREATE POLICY "Users can create own transactions" ON transactions FOR INSERT WITH CHECK (
-	EXISTS (SELECT 1 FROM accounts WHERE accounts.id = transactions.account_id AND accounts.user_id = auth.uid())
-);
-
-CREATE POLICY "Users can view own transfers" ON transfers FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own transfers" ON transfers FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own bills" ON bills FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can manage own bills" ON bills FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own bill payments" ON bill_payments FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own bill payments" ON bill_payments FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own checks" ON checks FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can manage own checks" ON checks FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own check orders" ON check_orders FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own check orders" ON check_orders FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own statements" ON statements FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own beneficiaries" ON beneficiaries FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can manage own beneficiaries" ON beneficiaries FOR ALL USING (auth.uid() = user_id);

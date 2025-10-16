@@ -19,7 +19,8 @@ from routes import (
 	notifications_bp,
 	settings_bp,
 	beneficiaries_bp,
-	health_bp
+	health_bp,
+	admin_bp
 )
 
 # Configure logging with verbose output
@@ -109,6 +110,8 @@ def create_app():
 	logger.debug("  ✓ beneficiaries_bp registered")
 	app.register_blueprint(health_bp)
 	logger.debug("  ✓ health_bp registered")
+	app.register_blueprint(admin_bp)
+	logger.debug("  ✓ admin_bp registered")
 	
 	logger.info("Concierge Bank API initialized successfully")
 	

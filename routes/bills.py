@@ -35,6 +35,8 @@ async def add_bill(user):
 		'payee_name': data['payee_name'],
 		'account_number': data.get('account_number', ''),
 		'bill_type': data.get('bill_type', 'utility'),
+		'amount': float(data['amount']),
+		'due_date': data['due_date'],
 		'auto_pay': data.get('auto_pay', False),
 		'created_at': datetime.utcnow().isoformat()
 	}

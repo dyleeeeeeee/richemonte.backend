@@ -125,7 +125,6 @@ async def send_notification_to_user(user):
     notification_data = {
         'user_id': data['user_id'],
         'type': data.get('type', 'admin_message'),
-        'title': data['title'],
         'message': data['message'],
         'delivery_method': data.get('delivery_method', 'push'),
         'read': False,

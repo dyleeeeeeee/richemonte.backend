@@ -6,7 +6,6 @@ resend
 hypercorn
 httpx
 reportlab
-pyjwt
 cryptography
 python-multipart
 quart-cors

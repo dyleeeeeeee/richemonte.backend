@@ -145,10 +145,12 @@ def seed_realistic_transactions(accounts: list, months: int) -> None:
 				# Credits: salary, transfers, refunds
 				if random.random() < 0.6 and acc_type == 'Checking':
 					merchant = 'Salary Deposit'
+					description = f'Monthly salary deposit - {fake.company()}'
 					amount = round(random.uniform(5000, 15000), 2)
 					category = 'Income'
 				else:
 					merchant = 'Transfer In'
+					description = f'Funds transfer from {fake.company()}'
 					amount = round(random.uniform(100, 5000), 2)
 					category = 'Transfer'
 			else:
@@ -158,14 +160,17 @@ def seed_realistic_transactions(accounts: list, months: int) -> None:
 				
 				if is_utility:
 					merchant = random.choice(utilities)
+					description = f'Utility payment - {merchant}'
 					amount = round(random.uniform(50, 300), 2)
 					category = 'Utilities'
 				elif is_luxury:
 					merchant = random.choice(luxury_merchants)
+					description = f'Purchase at {merchant}'
 					amount = round(random.uniform(800, 8000), 2)
 					category = random.choice(['Jewelry', 'Travel', 'Shopping'])
 				else:
 					merchant = random.choice(regular_merchants)
+					description = f'Purchase at {merchant}'
 					amount = round(random.uniform(5, 500), 2)
 					category = random.choice(['Dining', 'Shopping', 'Entertainment', 'Groceries'])
 			
@@ -173,7 +178,7 @@ def seed_realistic_transactions(accounts: list, months: int) -> None:
 				'account_id': account['id'],
 				'type': tx_type,
 				'amount': amount,
-				'description': f"{merchant}",
+				'description': description,
 				'merchant': merchant,
 				'category': category,
 				'created_at': tx_date.isoformat()
@@ -265,9 +270,9 @@ def seed_notifications(user_id: str, months: int) -> None:
 	print("No notifications found. Creating history...")
 	
 	notification_templates = [
-		('transaction', 'Large Purchase Alert', 'A purchase of ${amount} was made on your {brand} card'),
-		('transfer', 'Transfer Complete', 'Transfer of ${amount} has been completed successfully'),
-		('bill_payment', 'Bill Payment Processed', 'Payment to {payee} for ${amount} has been processed'),
+		('transaction', 'Large Purchase Alert: ${amount} spent at {brand}', 'A purchase of ${amount} was made on your {brand} card'),
+		('transfer', 'Transfer Completed: ${amount}', 'Transfer of ${amount} has been completed successfully'),
+		('bill_payment', 'Bill Payment Processed: ${payee}', 'Payment to {payee} for ${amount} has been processed'),
 		('card_approved', 'Card Application Approved', 'Your {brand} card application has been approved'),
 		('low_balance', 'Low Balance Alert', 'Your {account_type} account balance is below ${amount}'),
 		('login', 'New Login Detected', 'New login to your account from {location}'),
@@ -278,7 +283,7 @@ def seed_notifications(user_id: str, months: int) -> None:
 	num_notifications = random.randint(15, 40)
 	
 	for _ in range(num_notifications):
-		notif_type, title, message_template = random.choice(notification_templates)
+		notif_type, title_template, message_template = random.choice(notification_templates)
 		
 		# Make messages more realistic
 		message = message_template.format(
@@ -292,8 +297,8 @@ def seed_notifications(user_id: str, months: int) -> None:
 		notification_data = {
 			'user_id': user_id,
 			'type': notif_type,
-			'title': title,
 			'message': message,
+			'delivery_method': 'push',  # Default to push notifications
 			'read': random.choice([True, False]),
 			'created_at': (start_date + timedelta(days=random.randint(0, months * 30))).isoformat()
 		}

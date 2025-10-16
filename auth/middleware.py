@@ -8,15 +8,21 @@ from .jwt_handler import verify_jwt_token
 
 
 async def get_current_user() -> Optional[Dict[str, Any]]:
-	"""Get current authenticated user from JWT cookie
+	"""Get current authenticated user from JWT token in Authorization header
 	
 	Returns:
 		User payload dict or None if not authenticated
 	"""
-	token = request.cookies.get('auth_token')
-	if not token:
+	auth_header = request.headers.get('Authorization')
+	if not auth_header:
 		return None
 	
+	# Extract token from "Bearer <token>" format
+	parts = auth_header.split()
+	if len(parts) != 2 or parts[0].lower() != 'bearer':
+		return None
+	
+	token = parts[1]
 	payload = verify_jwt_token(token)
 	if not payload:
 		return None

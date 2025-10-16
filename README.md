@@ -34,22 +34,31 @@ backend/
 └── templates/                # Email templates
 ```
 
-## 🔌 API Endpoints (22 total)
+## 🔌 API Endpoints
 
-See `BACKEND_CLEANUP_COMPLETE.md` for complete endpoint list.
+**Authentication** (4 endpoints)
+- POST /api/auth/register, /api/auth/login, /api/auth/logout
+- GET /api/auth/me
+
+**Core Banking** (13 endpoints)
+- Accounts, Cards, Transfers, Bills, Checks, Beneficiaries
+
+**User Services** (5 endpoints)  
+- Settings, Notifications, Statements
 
 ## 🌐 Deployment
 
 **Procfile** included for Railway/Render deployment.
 
-## 📚 Documentation
+## 📚 Recent Updates
 
-- `BACKEND_CLEANUP_COMPLETE.md` - Complete technical documentation
+- `AUTH_SETTINGS_SYNC_COMPLETE.md` - Auth overhaul & settings implementation
+- `UX_CONSISTENCY_COMPLETE.md` - Dashboard UX standardization
 - `schema.sql` - Database schema reference
 
 ## ✅ Status
 
-- **Code Quality**: Excellent (99/100)
-- **Test Coverage**: All imports verified
+- **Auth**: Pure JWT with Bearer tokens ✅
+- **Settings**: Profile, Security, Notifications - All persistent ✅
+- **UX**: Light glassmorphic mode across all pages ✅
 - **Production Ready**: Yes ✅
-- **Frontend Sync**: 100% ✓

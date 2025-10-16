@@ -3,7 +3,7 @@ Authentication routes for Concierge Bank
 """
 import logging
 from datetime import datetime
-from quart import Blueprint, request, jsonify, make_response
+from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
 from core.config import JWT_EXPIRATION_HOURS, SUPABASE_URL, SUPABASE_KEY
@@ -72,26 +72,16 @@ async def register():
         # Create JWT token
         token = create_jwt_token(auth_response.user.id, data['email'])
         
-        response = await make_response(jsonify({
+        logger.info(f"User registered successfully: {data['email']}")
+        return jsonify({
             'message': 'Registration successful',
+            'token': token,
             'user': {
                 'id': auth_response.user.id,
                 'email': data['email'],
                 'full_name': data.get('full_name', '')
             }
-        }))
-        
-        response.set_cookie(
-            'auth_token',
-            token,
-            httponly=True,
-            secure=True,
-            samesite='lax',
-            max_age=JWT_EXPIRATION_HOURS * 3600
-        )
-        
-        logger.info(f"User registered successfully: {data['email']}")
-        return response
+        })
         
     except Exception as e:
         logger.error(f"Registration error: {str(e)}")
@@ -120,22 +110,12 @@ async def login():
         # Create JWT token
         token = create_jwt_token(auth_response.user.id, data['email'])
         
-        response = await make_response(jsonify({
-            'message': 'Login successful',
-            'user': user_data.data
-        }))
-        
-        response.set_cookie(
-            'auth_token',
-            token,
-            httponly=True,
-            secure=True,
-            samesite='lax',
-            max_age=JWT_EXPIRATION_HOURS * 3600
-        )
-        
         logger.info(f"User logged in: {data['email']}")
-        return response
+        return jsonify({
+            'message': 'Login successful',
+            'token': token,
+            'user': user_data.data
+        })
         
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
@@ -145,9 +125,7 @@ async def login():
 @auth_bp.route('/logout', methods=['POST'])
 async def logout():
     """Logout user"""
-    response = await make_response(jsonify({'message': 'Logged out successfully'}))
-    response.set_cookie('auth_token', '', expires=0)
-    return response
+    return jsonify({'message': 'Logged out successfully'})
 
 
 @auth_bp.route('/me', methods=['GET'])

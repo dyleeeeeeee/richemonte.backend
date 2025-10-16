@@ -10,7 +10,7 @@ from core.config import JWT_EXPIRATION_HOURS, SUPABASE_URL, SUPABASE_KEY
 from auth import create_jwt_token, require_auth
 from supabase import create_client, Client
 from utils.recaptcha import verify_recaptcha
-from services import notify_user
+from services.twofa import TwoFactorAuthService
 from templates import welcome_email
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ async def register():
 
 @auth_bp.route('/login', methods=['POST'])
 async def login():
-    """Login user with anti-bot protection"""
+    """Login user with anti-bot protection and 2FA support"""
     data = await request.get_json()
     
     try:
@@ -119,10 +119,70 @@ async def login():
         # Get user profile from users table
         user_data = supabase_client.table('users').select('*').eq('id', auth_response.user.id).single().execute()
         
-        # Create JWT token
-        token = create_jwt_token(auth_response.user.id, data['email'])
+        # Check if 2FA is enabled
+        is_2fa_enabled = await TwoFactorAuthService.is_2fa_enabled(auth_response.user.id)
         
-        logger.info(f"User logged in: {data['email']}")
+        if is_2fa_enabled:
+            # Send OTP email for 2FA verification
+            otp_result = await TwoFactorAuthService.send_otp_email(
+                auth_response.user.id,
+                data['email'],
+                user_data.data.get('full_name', '')
+            )
+            
+            if not otp_result['success']:
+                return jsonify({'error': 'Failed to send verification code'}), 500
+            
+            logger.info(f"2FA login initiated for user {data['email']}")
+            return jsonify({
+                'message': 'Verification code sent to your email',
+                'requires_2fa': True,
+                'user_id': auth_response.user.id,
+                'email': data['email'],
+                'expiry_minutes': 10
+            })
+        else:
+            # Standard login without 2FA
+            token = create_jwt_token(auth_response.user.id, data['email'])
+            
+            logger.info(f"User logged in: {data['email']}")
+            return jsonify({
+                'message': 'Login successful',
+                'token': token,
+                'user': user_data.data,
+                'requires_2fa': False
+            })
+        
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return jsonify({'error': str(e)}), 401
+
+
+@auth_bp.route('/verify-2fa', methods=['POST'])
+async def verify_2fa():
+    """Verify 2FA code and complete login"""
+    data = await request.get_json()
+    
+    try:
+        user_id = data.get('user_id')
+        email = data.get('email')
+        otp_code = data.get('otp_code')
+        
+        if not all([user_id, email, otp_code]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Verify OTP
+        verify_result = await TwoFactorAuthService.verify_otp(user_id, otp_code)
+        
+        if not verify_result['success']:
+            return jsonify({'error': verify_result['error']}), 401
+        
+        # Get user data and create token
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        user_data = supabase_client.table('users').select('*').eq('id', user_id).single().execute()
+        token = create_jwt_token(user_id, email)
+        
+        logger.info(f"2FA verification successful for user {email}")
         return jsonify({
             'message': 'Login successful',
             'token': token,
@@ -130,8 +190,44 @@ async def login():
         })
         
     except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        return jsonify({'error': str(e)}), 401
+        logger.error(f"2FA verification error: {str(e)}")
+        return jsonify({'error': 'Verification failed'}), 500
+
+
+@auth_bp.route('/verify-backup-code', methods=['POST'])
+async def verify_backup_code():
+    """Verify backup code for 2FA recovery"""
+    data = await request.get_json()
+    
+    try:
+        user_id = data.get('user_id')
+        email = data.get('email')
+        backup_code = data.get('backup_code')
+        
+        if not all([user_id, email, backup_code]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Verify backup code
+        verify_result = await TwoFactorAuthService.verify_backup_code(user_id, backup_code)
+        
+        if not verify_result['success']:
+            return jsonify({'error': verify_result['error']}), 401
+        
+        # Get user data and create token
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        user_data = supabase_client.table('users').select('*').eq('id', user_id).single().execute()
+        token = create_jwt_token(user_id, email)
+        
+        logger.info(f"Backup code verification successful for user {email}")
+        return jsonify({
+            'message': 'Login successful',
+            'token': token,
+            'user': user_data.data
+        })
+        
+    except Exception as e:
+        logger.error(f"Backup code verification error: {str(e)}")
+        return jsonify({'error': 'Verification failed'}), 500
 
 
 @auth_bp.route('/logout', methods=['POST'])

@@ -108,23 +108,86 @@ async def change_password(user):
 async def toggle_2fa(user):
 	"""Toggle two-factor authentication"""
 	data = await request.get_json()
-	
+
 	enabled = data.get('enabled', False)
-	
-	# Get existing notification preferences and merge
-	user_data = supabase.table('users').select('notification_preferences').eq('id', user['user_id']).single().execute()
-	existing_prefs = user_data.data.get('notification_preferences', {}) or {}
-	existing_prefs['two_factor_enabled'] = enabled
-	
-	# Store 2FA preference in user metadata
-	update_data = {
-		'notification_preferences': existing_prefs,
-		'updated_at': datetime.utcnow().isoformat()
-	}
-	
-	result = supabase.table('users').update(update_data).eq('id', user['user_id']).execute()
-	logger.info(f"2FA {'enabled' if enabled else 'disabled'} for user {user['user_id']}")
-	return jsonify({'enabled': enabled, 'message': f"2FA {'enabled' if enabled else 'disabled'} successfully"})
+
+	try:
+		if enabled:
+			# Get user email for setup
+			user_data = supabase.table('users').select('email, full_name').eq('id', user['user_id']).single().execute()
+			email = user_data.data['email']
+			user_name = user_data.data.get('full_name', '')
+
+			# Set up 2FA
+			setup_result = await TwoFactorAuthService.setup_2fa(user['user_id'], email, user_name)
+
+			if not setup_result['success']:
+				return jsonify({'error': setup_result.get('error', 'Failed to set up 2FA')}), 500
+
+			logger.info(f"2FA setup completed for user {user['user_id']}")
+			return jsonify({
+				'enabled': True,
+				'message': setup_result['message'],
+				'backup_codes': setup_result['backup_codes']  # Include backup codes in response
+			})
+		else:
+			# Disable 2FA
+			disable_result = await TwoFactorAuthService.disable_2fa(user['user_id'])
+
+			if not disable_result:
+				return jsonify({'error': 'Failed to disable 2FA'}), 500
+
+			logger.info(f"2FA disabled for user {user['user_id']}")
+			return jsonify({
+				'enabled': False,
+				'message': '2FA has been disabled successfully'
+			})
+
+	except Exception as e:
+		logger.error(f"2FA toggle error for user {user['user_id']}: {e}")
+		return jsonify({'error': 'Failed to toggle 2FA'}), 500
+
+
+@settings_bp.route('/security/2fa/status', methods=['GET'])
+@require_auth
+async def get_2fa_status(user):
+	"""Get 2FA status and configuration"""
+	try:
+		status = await TwoFactorAuthService.get_2fa_status(user['user_id'])
+		return jsonify(status)
+	except Exception as e:
+		logger.error(f"2FA status error for user {user['user_id']}: {e}")
+		return jsonify({'error': 'Failed to get 2FA status'}), 500
+
+
+@settings_bp.route('/security/2fa/regenerate-codes', methods=['POST'])
+@require_auth
+async def regenerate_backup_codes(user):
+	"""Regenerate backup codes for 2FA"""
+	try:
+		# Check if 2FA is enabled
+		if not await TwoFactorAuthService.is_2fa_enabled(user['user_id']):
+			return jsonify({'error': '2FA is not enabled'}), 400
+
+		# Get user info
+		user_data = supabase.table('users').select('email, full_name').eq('id', user['user_id']).single().execute()
+		email = user_data.data['email']
+		user_name = user_data.data.get('full_name', '')
+
+		# Regenerate codes
+		setup_result = await TwoFactorAuthService.setup_2fa(user['user_id'], email, user_name)
+
+		if not setup_result['success']:
+			return jsonify({'error': setup_result.get('error', 'Failed to regenerate codes')}), 500
+
+		return jsonify({
+			'message': 'Backup codes regenerated successfully',
+			'backup_codes': setup_result['backup_codes']
+		})
+
+	except Exception as e:
+		logger.error(f"Backup code regeneration error for user {user['user_id']}: {e}")
+		return jsonify({'error': 'Failed to regenerate backup codes'}), 500
 
 
 @settings_bp.route('/notifications', methods=['GET'])

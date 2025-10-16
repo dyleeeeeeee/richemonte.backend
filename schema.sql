@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 	balance DECIMAL(15, 2) DEFAULT 0,
 	currency TEXT DEFAULT 'USD',
 	status TEXT DEFAULT 'active', -- active, closed, frozen
+	routing_number TEXT DEFAULT '121000248', -- Wells Fargo routing number
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW()
 );

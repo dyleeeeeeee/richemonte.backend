@@ -13,6 +13,7 @@ from .beneficiaries import beneficiaries_bp
 from .health import health_bp
 from .admin import admin_bp
 from .concierge import concierge_bp
+from .search import search_bp
 
 __all__ = [
 	'auth_bp',
@@ -27,4 +28,5 @@ __all__ = [
 	'health_bp',
 	'admin_bp',
 	'concierge_bp',
+	'search_bp',
 ]

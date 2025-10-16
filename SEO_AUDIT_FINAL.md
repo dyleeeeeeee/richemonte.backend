@@ -27,7 +27,7 @@ Your SEO implementation is now production-ready and optimized for top rankings o
 
 ### 2. Domain Migration ✅
 **Status:** COMPLETE
-- All URLs updated from conciergebank.com → conciergebank.us
+- All URLs updated from conciergebank.us → conciergebank.us
 - Files updated:
   - `app/layout.tsx` (root metadata)
   - `public/robots.txt`

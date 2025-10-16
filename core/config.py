@@ -19,7 +19,7 @@ CARD_EXPIRY_YEARS = 5
 CARD_EXPIRY_DAYS = 365 * CARD_EXPIRY_YEARS  # 1825 days
 
 # Email Configuration
-EMAIL_FROM = 'Concierge Bank <noreply@conciergebank.com>'
+EMAIL_FROM = 'Concierge Bank <noreply@conciergebank.us>'
 LUXURY_GOLD_COLOR = '#B8860B'
 
 # Supabase Configuration

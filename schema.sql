@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS cards (
 	expiry_date TEXT NOT NULL,
 	credit_limit DECIMAL(15, 2),
 	balance DECIMAL(15, 2) DEFAULT 0,
-	status TEXT DEFAULT 'active', -- active, locked, expired
+	status TEXT DEFAULT 'active' CHECK (status IN ('active', 'locked', 'expired', 'reported', 'blocked')),
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -142,6 +142,19 @@ CREATE TABLE IF NOT EXISTS notifications (
 	created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Card Issue Reports table
+CREATE TABLE IF NOT EXISTS card_issue_reports (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+	card_id UUID REFERENCES cards(id) ON DELETE CASCADE,
+	issue_type TEXT NOT NULL CHECK (issue_type IN ('lost', 'stolen', 'damaged', 'other')),
+	description TEXT,
+	status TEXT DEFAULT 'investigating' CHECK (status IN ('investigating', 'resolved', 'card_blocked')),
+	admin_notes TEXT,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	resolved_at TIMESTAMPTZ
+);
+
 -- Beneficiaries table
 CREATE TABLE IF NOT EXISTS beneficiaries (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -165,6 +178,9 @@ CREATE INDEX IF NOT EXISTS idx_bills_user_id ON bills(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_beneficiaries_user_id ON beneficiaries(user_id);
+CREATE INDEX IF NOT EXISTS idx_card_issue_reports_user_id ON card_issue_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_card_issue_reports_card_id ON card_issue_reports(card_id);
+CREATE INDEX IF NOT EXISTS idx_card_issue_reports_created_at ON card_issue_reports(created_at DESC);
 
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -179,3 +195,4 @@ ALTER TABLE check_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE statements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE beneficiaries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE card_issue_reports ENABLE ROW LEVEL SECURITY;

@@ -24,16 +24,17 @@ async def register():
     data = await request.get_json()
     
     try:
-        # Verify reCAPTCHA token (anti-bot)
+        # Verify reCAPTCHA token (anti-bot) - REQUIRED
         recaptcha_token = data.get('recaptcha_token')
-        if recaptcha_token:
-            success, score, error = await verify_recaptcha(recaptcha_token, 'register')
-            if not success:
-                logger.warning(f"Bot registration attempt blocked: {error}")
-                return jsonify({'error': 'Registration failed. Please try again.'}), 403
-            logger.info(f"reCAPTCHA passed: score={score}")
-        else:
-            logger.warning("Registration without reCAPTCHA token")
+        if not recaptcha_token:
+            logger.warning("Registration without reCAPTCHA token - BLOCKED")
+            return jsonify({'error': 'Security verification required. Please try again.'}), 403
+        
+        success, score, error = await verify_recaptcha(recaptcha_token, 'register')
+        if not success:
+            logger.warning(f"Bot registration attempt blocked: {error}")
+            return jsonify({'error': 'Registration failed. Please try again.'}), 403
+        logger.info(f"reCAPTCHA passed: score={score}")
         
         # Get Supabase client
         supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -90,10 +91,21 @@ async def register():
 
 @auth_bp.route('/login', methods=['POST'])
 async def login():
-    """Login user"""
+    """Login user with anti-bot protection"""
     data = await request.get_json()
     
     try:
+        # Verify reCAPTCHA token (anti-bot)
+        recaptcha_token = data.get('recaptcha_token')
+        if recaptcha_token:
+            success, score, error = await verify_recaptcha(recaptcha_token, 'login')
+            if not success:
+                logger.warning(f"Bot login attempt blocked: {error}")
+                return jsonify({'error': 'Login failed. Please try again.'}), 403
+            logger.info(f"Login reCAPTCHA passed: score={score}")
+        else:
+            logger.warning("Login without reCAPTCHA token")
+        
         # Authenticate with Supabase
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
         auth_response = supabase_client.auth.sign_in_with_password({

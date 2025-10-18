@@ -9,7 +9,6 @@ import os
 def base_email_template(
     title: str,
     hero_title: str,
-    hero_subtitle: str,
     content_html: str,
     cta_text: str = None,
     cta_url: str = None,
@@ -108,27 +107,40 @@ def base_email_template(
             margin: 0 auto;
         }}
 
-        /* Hero Section */
-        .hero-section {{
-            background: linear-gradient(135deg, #F2CA27 0%, #EBA420 100%);
-            padding: 50px 40px;
-            text-align: center;
+        /* Hero Image Section */
+        .hero-image-section {{
+            position: relative;
+            overflow: hidden;
+            background: #1a1a1a;
+        }}
+        .hero-image {{
+            width: 100%;
+            height: auto;
+            display: block;
+            opacity: 0.9;
+        }}
+        .hero-overlay {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(26, 26, 26, 0.3) 0%, rgba(26, 26, 26, 0.7) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 40px;
         }}
         .hero-title {{
             font-family: 'Gruppo', sans-serif;
-            font-size: 36px;
+            font-size: 48px;
             font-weight: 400;
-            color: #1a1a1a;
+            color: #FEFDFB;
             text-align: center;
-            margin: 0 0 15px 0;
-            letter-spacing: 1px;
-        }}
-        .hero-subtitle {{
-            font-family: 'Work Sans', sans-serif;
-            font-size: 18px;
-            color: #1a1a1a;
             margin: 0;
-            opacity: 0.9;
+            line-height: 1.2;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 1px;
         }}
 
         /* Content Section */
@@ -298,14 +310,11 @@ def base_email_template(
             .header-section img {{
                 max-width: 250px !important;
             }}
-            .hero-section {{
+            .hero-overlay {{
                 padding: 40px 20px !important;
             }}
             .hero-title {{
-                font-size: 28px !important;
-            }}
-            .hero-subtitle {{
-                font-size: 16px !important;
+                font-size: 32px !important;
             }}
             .content-section {{
                 padding: 40px 25px !important;
@@ -341,7 +350,7 @@ def base_email_template(
 
         @media only screen and (max-width: 480px) {{
             .hero-title {{
-                font-size: 24px !important;
+                font-size: 28px !important;
             }}
             .content-title {{
                 font-size: 22px !important;
@@ -366,11 +375,13 @@ def base_email_template(
                         </td>
                     </tr>
 
-                    <!-- Hero Section -->
+                    <!-- Hero Image Section -->
                     <tr>
-                        <td class="hero-section">
-                            <h1 class="hero-title">{hero_title}</h1>
-                            <p class="hero-subtitle">{hero_subtitle}</p>
+                        <td class="hero-image-section" style="position: relative;">
+                            <img src="https://www.richemont.com/media/vy0f4smm/richemont-hq-entrance-evening-_subpage.png" alt="Concierge Bank" class="hero-image" style="width: 600px; height: 400px; object-fit: cover;">
+                            <div class="hero-overlay">
+                                <h1 class="hero-title">{hero_title}</h1>
+                            </div>
                         </td>
                     </tr>
 
@@ -411,33 +422,12 @@ def welcome_email(full_name: str) -> str:
     """Professional welcome email for new Concierge Bank members"""
 
     content_html = f"""
-                            <h3 class="content-title">Welcome to Concierge Bank</h3>
-
+                            <h3 class="content-title">Welcome to Excellence</h3>
                             <p class="content-text">
-                                Dear {full_name or 'Valued Client'},
+                                At Concierge Bank, we understand that your financial journey is unique. Our personalized banking solutions are designed to provide you with the exceptional service and expertise you deserve.
                             </p>
-
-                            <p class="content-text">
-                                Welcome to Concierge Bank, where luxury banking meets personalized service.
-                                Your account has been successfully created and is ready for your exclusive banking experience.
-                            </p>
-
                             <p class="content-text">
                                 Experience banking that adapts to your lifestyle, with dedicated advisors ready to help you achieve your financial goals.
-                            </p>
-
-                            <div class="info-box">
-                                <h4 class="info-title">🏦 Your Banking Journey Begins</h4>
-                                <ul class="info-text" style="padding-left: 20px; list-style-type: disc;">
-                                    <li>Access your dashboard to explore premium services</li>
-                                    <li>Set up security preferences and notifications</li>
-                                    <li>Connect with your dedicated relationship manager</li>
-                                    <li>Discover exclusive investment opportunities</li>
-                                </ul>
-                            </div>
-
-                            <p class="content-text" style="font-style: italic; text-align: center; margin-top: 30px;">
-                                À votre service éternel!
                             </p>"""
 
     app_url = os.environ.get('NEXT_PUBLIC_APP_URL', 'https://conciergebank.us')
@@ -445,10 +435,10 @@ def welcome_email(full_name: str) -> str:
     return base_email_template(
         title="Welcome to Concierge Bank",
         hero_title="Welcome to Excellence",
-        hero_subtitle="Your banking journey begins here",
+        hero_subtitle="",  # Not used in new template
         content_html=content_html,
-        cta_text="Access Your Account",
-        cta_url=f"{app_url}/dashboard",
+        cta_text="Explore Our Services",
+        cta_url=f"{app_url}",
         footer_text="Welcome to Concierge Bank! Your account is now active and ready for use."
     )
 
@@ -494,7 +484,6 @@ def account_created_email(account_type: str, account_number: str, initial_deposi
     return base_email_template(
         title="Account Created",
         hero_title="Account Opened Successfully",
-        hero_subtitle="Your banking experience begins now",
         content_html=content_html,
         cta_text="View Account Details",
         cta_url=f"{app_url}/dashboard/accounts",
@@ -547,7 +536,6 @@ def card_approved_email(card_brand: str, card_type: str, card_last_four: str, cr
     return base_email_template(
         title="Card Approved",
         hero_title="Card Application Approved",
-        hero_subtitle="Welcome to premium banking privileges",
         content_html=content_html,
         cta_text="Manage Cards",
         cta_url=f"{app_url}/dashboard/cards",
@@ -594,7 +582,6 @@ def transfer_confirmation_email(amount: float, new_balance: float) -> str:
     return base_email_template(
         title="Transfer Confirmation",
         hero_title="Transfer Completed",
-        hero_subtitle="Your funds have been transferred successfully",
         content_html=content_html,
         cta_text="View Transaction History",
         cta_url=f"{app_url}/dashboard/transactions",
@@ -645,7 +632,6 @@ def bill_payment_email(payee_name: str, amount: float, payment_date: str) -> str
     return base_email_template(
         title="Bill Payment Confirmation",
         hero_title="Bill Payment Completed",
-        hero_subtitle="Your payment has been processed successfully",
         content_html=content_html,
         cta_text="Manage Bill Payments",
         cta_url=f"{app_url}/dashboard/bills",
@@ -706,7 +692,6 @@ def check_deposit_email(amount: float, check_number: str) -> str:
     return base_email_template(
         title="Check Deposit Confirmation",
         hero_title="Check Deposit Received",
-        hero_subtitle="Your deposit is being processed",
         content_html=content_html,
         cta_text="Track Deposit Status",
         cta_url=f"{app_url}/dashboard/deposits",
@@ -765,7 +750,6 @@ def check_order_email(design: str, quantity: int, price: float) -> str:
     return base_email_template(
         title="Check Order Confirmation",
         hero_title="Check Order Received",
-        hero_subtitle="Your premium checks are being prepared",
         content_html=content_html,
         cta_text="Reorder Checks",
         cta_url=f"{app_url}/dashboard/checks",

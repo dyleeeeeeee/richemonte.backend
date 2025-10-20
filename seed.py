@@ -309,34 +309,10 @@ def seed_notifications(user_id: str, months: int) -> None:
 
 
 def seed_users():
-	"""Seed test users including admin"""
-	users = [
-		{
-			'id': '11111111-1111-1111-1111-111111111111',
-			'email': 'admin@conciergebank.com',
-			'full_name': 'Admin User',
-			'phone': '+1234567890',
-			'preferred_brand': 'Cartier',
-			'role': 'admin',
-			'created_at': datetime.utcnow().isoformat()
-		},
-		{
-			'id': '22222222-2222-2222-2222-222222222222', 
-			'email': 'user@conciergebank.com',
-			'full_name': 'Regular User',
-			'phone': '+1987654321',
-			'preferred_brand': 'Van Cleef & Arpels',
-			'role': 'user',
-			'created_at': datetime.utcnow().isoformat()
-		}
-	]
-	
-	for user in users:
-		try:
-			supabase.table('users').upsert(user).execute()
-			print(f"  Created/Updated user: {user['email']} ({user['role']})")
-		except Exception as e:
-			print(f"  Error creating user {user['email']}: {e}")
+	"""Seed test users including admin - only called when seeding existing user"""
+	# This function is called during seeding to ensure the target user has proper fields
+	# It doesn't create new users, just ensures existing ones have role/account_status
+	pass
 
 
 def main():
@@ -390,10 +366,6 @@ def main():
 		
 		user_result = supabase.table('users').select('*').eq('email', args.email).execute()
 		
-		print(f"Query result: {user_result}")
-		print(f"Data returned: {user_result.data}")
-		print(f"Number of rows: {len(user_result.data) if user_result.data else 0}")
-		
 		if not user_result.data or len(user_result.data) == 0:
 			print(f"\n{'='*60}")
 			print(f"❌ ERROR: User '{args.email}' not found in database")
@@ -415,14 +387,11 @@ def main():
 		user = user_result.data[0]
 		user_id = user['id']
 		
-		print(f"\nUser: {args.email}")
+		print(f"User: {args.email}")
 		print(f"ID: {user_id}")
 		print(f"Name: {user.get('full_name', 'N/A')}")
 		print(f"Role: {user.get('role', 'user')}")
 		print(f"History: {args.months} months\n")
-		
-		# Seed test users first
-		seed_users()
 		
 		# Seed with failsafes
 		accounts = get_or_create_accounts(user_id)

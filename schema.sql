@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 	preferred_brand TEXT DEFAULT 'Cartier',
 	notification_preferences JSONB DEFAULT '{"email": true, "sms": false, "push": true}'::jsonb,
 	role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+	account_status TEXT DEFAULT 'active' CHECK (account_status IN ('active', 'blocked', 'suspended')),
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW()
 );

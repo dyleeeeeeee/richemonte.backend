@@ -45,5 +45,13 @@ def require_auth(f):
 		user = await get_current_user()
 		if not user:
 			return jsonify({'error': 'Unauthorized'}), 401
+		
+		# Check if user account is blocked
+		account_status = user.get('account_status', 'active')
+		if account_status == 'blocked':
+			return jsonify({'error': 'Account blocked. Contact support.'}), 403
+		if account_status == 'suspended':
+			return jsonify({'error': 'Account suspended. Contact support.'}), 403
+		
 		return await f(user, *args, **kwargs)
 	return decorated_function

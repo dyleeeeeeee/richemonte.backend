@@ -46,7 +46,7 @@ async def update_user(user, user_id):
     data = await request.get_json()
 
     # Only allow updating certain fields
-    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role']
+    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role', 'account_status']
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
     result = supabase.table('users').update(update_data).eq('id', user_id).execute()
@@ -167,3 +167,41 @@ async def get_admin_stats(user):
     }
 
     return jsonify(stats)
+
+
+@admin_bp.route('/users/<user_id>/block', methods=['POST'])
+@require_auth
+async def block_user(user, user_id):
+    """Block a user from logging in (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    # Prevent admin from blocking themselves
+    if user_id == user['user_id']:
+        return jsonify({'error': 'Cannot block yourself'}), 400
+
+    result = supabase.table('users').update({
+        'account_status': 'blocked',
+        'updated_at': datetime.utcnow().isoformat()
+    }).eq('id', user_id).execute()
+
+    logger.info(f"User {user_id} blocked by admin {user['user_id']}")
+    return jsonify(result.data[0])
+
+
+@admin_bp.route('/users/<user_id>/unblock', methods=['POST'])
+@require_auth
+async def unblock_user(user, user_id):
+    """Unblock a user (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    result = supabase.table('users').update({
+        'account_status': 'active',
+        'updated_at': datetime.utcnow().isoformat()
+    }).eq('id', user_id).execute()
+
+    logger.info(f"User {user_id} unblocked by admin {user['user_id']}")
+    return jsonify(result.data[0])

@@ -119,6 +119,15 @@ async def login():
         # Get user profile from users table
         user_data = supabase_client.table('users').select('*').eq('id', auth_response.user.id).single().execute()
         
+        # Check if account is blocked or suspended
+        account_status = user_data.data.get('account_status', 'active')
+        if account_status == 'blocked':
+            logger.warning(f"Blocked user login attempt: {data['email']}")
+            return jsonify({'error': 'Your account has been blocked. Please contact Concierge Bank support for assistance.'}), 403
+        if account_status == 'suspended':
+            logger.warning(f"Suspended user login attempt: {data['email']}")
+            return jsonify({'error': 'Your account has been suspended. Please contact Concierge Bank support for assistance.'}), 403
+        
         # Check if 2FA is enabled
         is_2fa_enabled = await TwoFactorAuthService.is_2fa_enabled(auth_response.user.id)
         
@@ -180,6 +189,16 @@ async def verify_2fa():
         # Get user data and create token
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
         user_data = supabase_client.table('users').select('*').eq('id', user_id).single().execute()
+        
+        # Check if account is blocked or suspended (even after 2FA)
+        account_status = user_data.data.get('account_status', 'active')
+        if account_status == 'blocked':
+            logger.warning(f"Blocked user 2FA attempt: {email}")
+            return jsonify({'error': 'Your account has been blocked. Please contact Concierge Bank support for assistance.'}), 403
+        if account_status == 'suspended':
+            logger.warning(f"Suspended user 2FA attempt: {email}")
+            return jsonify({'error': 'Your account has been suspended. Please contact Concierge Bank support for assistance.'}), 403
+        
         token = create_jwt_token(user_id, email)
         
         logger.info(f"2FA verification successful for user {email}")
@@ -216,6 +235,16 @@ async def verify_backup_code():
         # Get user data and create token
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
         user_data = supabase_client.table('users').select('*').eq('id', user_id).single().execute()
+        
+        # Check if account is blocked or suspended (even after backup code)
+        account_status = user_data.data.get('account_status', 'active')
+        if account_status == 'blocked':
+            logger.warning(f"Blocked user backup code attempt: {email}")
+            return jsonify({'error': 'Your account has been blocked. Please contact Concierge Bank support for assistance.'}), 403
+        if account_status == 'suspended':
+            logger.warning(f"Suspended user backup code attempt: {email}")
+            return jsonify({'error': 'Your account has been suspended. Please contact Concierge Bank support for assistance.'}), 403
+        
         token = create_jwt_token(user_id, email)
         
         logger.info(f"Backup code verification successful for user {email}")

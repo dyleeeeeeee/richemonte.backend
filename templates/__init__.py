@@ -10,10 +10,6 @@ from .email_templates import (
 	check_deposit_email,
 	check_order_email
 )
-from .twofa import (
-	twofa_code_email,
-	twofa_setup_email
-)
 
 __all__ = [
 	'welcome_email',
@@ -22,7 +18,5 @@ __all__ = [
 	'transfer_confirmation_email',
 	'bill_payment_email',
 	'check_deposit_email',
-	'check_order_email',
-	'twofa_code_email',
-	'twofa_setup_email'
+	'check_order_email'
 ]

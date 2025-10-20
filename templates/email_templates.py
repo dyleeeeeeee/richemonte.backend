@@ -10,6 +10,7 @@ def base_email_template(
     title: str,
     hero_title: str,
     content_html: str,
+    hero_subtitle: str = "",
     cta_text: str = None,
     cta_url: str = None,
     footer_text: str = None
@@ -435,8 +436,8 @@ def welcome_email(full_name: str) -> str:
     return base_email_template(
         title="Welcome to Concierge Bank",
         hero_title="Welcome to Excellence",
-        hero_subtitle="",  # Not used in new template
         content_html=content_html,
+        hero_subtitle="",  # Not used in new template
         cta_text="Explore Our Services",
         cta_url=f"{app_url}",
         footer_text="Welcome to Concierge Bank! Your account is now active and ready for use."

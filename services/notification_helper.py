@@ -50,22 +50,22 @@ async def notify_user(
 	prefs = {**default_prefs, **user_prefs}
 	
 	# Check if email should be sent based on notification type
-	send_email = False
+	should_send_email = False
 	if notification_type in ['transaction', 'transfer', 'account_created']:
-		send_email = prefs.get('email_transactions', True)
+		should_send_email = prefs.get('email_transactions', True)
 	elif notification_type in ['bill_payment', 'bill_due']:
-		send_email = prefs.get('email_bills', True)
+		should_send_email = prefs.get('email_bills', True)
 	elif notification_type in ['security', 'login_alert', 'card_issue_reported', 'password_changed']:
-		send_email = prefs.get('email_security', True)
+		should_send_email = prefs.get('email_security', True)
 	else:
 		# For other types, send email by default unless specifically disabled
-		send_email = True
+		should_send_email = True
 	
 	# Always log notification to database (for in-app notifications)
 	await log_notification(supabase, user_id, notification_type, notification_message)
 	
 	# Send email only if user preferences allow it and email content provided
-	if send_email and email_subject and email_html:
+	if should_send_email and email_subject and email_html:
 		email = await get_user_email(supabase, user_id)
 		if email:
 			await send_email(email, email_subject, email_html)

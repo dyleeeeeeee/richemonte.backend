@@ -9,8 +9,8 @@ import os
 def base_email_template(
     title: str,
     hero_title: str,
-    hero_subtitle: str,
     content_html: str,
+    hero_subtitle: str = "",
     cta_text: str = None,
     cta_url: str = None,
     footer_text: str = None
@@ -496,8 +496,8 @@ def twofa_setup_email(full_name: str, backup_codes: list) -> str:
     return base_email_template(
         title="2FA Setup Complete",
         hero_title="🔐 Two-Factor Authentication Enabled",
-        hero_subtitle="Your account is now more secure",
         content_html=content_html,
+        hero_subtitle="Your account is now more secure",
         cta_text="Manage Security Settings",
         cta_url=f"{app_url}/dashboard/settings/security",
         footer_text="This is an automated security notification from Concierge Bank. If you did not enable 2FA, please contact support immediately."
@@ -540,8 +540,8 @@ def twofa_code_email(full_name: str, otp_code: str) -> str:
     return base_email_template(
         title="Login Verification",
         hero_title="🔐 Login Verification Required",
-        hero_subtitle="Please verify your identity",
         content_html=content_html,
+        hero_subtitle="Please verify your identity",
         cta_text="Return to Login",
         cta_url=f"{app_url}/login",
         footer_text="This code was requested for login to your Concierge Bank account. If you did not request this, please secure your account immediately."

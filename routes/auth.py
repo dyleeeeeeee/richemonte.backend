@@ -11,6 +11,7 @@ from auth import create_jwt_token, require_auth
 from supabase import create_client, Client
 from utils.recaptcha import verify_recaptcha
 from services.twofa import TwoFactorAuthService
+from services import notify_user
 from templates import welcome_email
 
 logger = logging.getLogger(__name__)

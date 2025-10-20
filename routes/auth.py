@@ -9,7 +9,7 @@ from core import get_supabase_client
 from core.config import JWT_EXPIRATION_HOURS, SUPABASE_URL, SUPABASE_KEY
 from auth import create_jwt_token, require_auth
 from supabase import create_client, Client
-from utils.recaptcha import verify_recaptcha
+from utils.bot_prevention import validate_bot_prevention
 from services.twofa import TwoFactorAuthService
 from services import notify_user
 from templates import welcome_email
@@ -19,23 +19,35 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 supabase = get_supabase_client()
 
 
+def get_client_ip() -> str:
+	"""Extract client IP address from request"""
+	try:
+		# Check for X-Forwarded-For header (proxy/load balancer)
+		if request.headers.get('X-Forwarded-For'):
+			return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+		# Check for X-Real-IP header
+		if request.headers.get('X-Real-IP'):
+			return request.headers.get('X-Real-IP')
+		# Fallback to remote_addr
+		return request.remote_addr or '0.0.0.0'
+	except Exception as e:
+		logger.error(f"Error getting client IP: {e}")
+		return '0.0.0.0'
+
+
 @auth_bp.route('/register', methods=['POST'])
 async def register():
     """Register new user with anti-bot protection"""
     data = await request.get_json()
     
     try:
-        # Verify reCAPTCHA token (anti-bot) - REQUIRED
-        recaptcha_token = data.get('recaptcha_token')
-        if not recaptcha_token:
-            logger.warning("Registration without reCAPTCHA token - BLOCKED")
-            return jsonify({'error': 'Security verification required. Please try again.'}), 403
-        
-        success, score, error = await verify_recaptcha(recaptcha_token, 'register')
-        if not success:
-            logger.warning(f"Bot registration attempt blocked: {error}")
-            return jsonify({'error': 'Registration failed. Please try again.'}), 403
-        logger.info(f"reCAPTCHA passed: score={score}")
+        # Simple bot prevention (rate limiting + honeypot)
+        client_ip = get_client_ip()
+        is_valid, error_msg = validate_bot_prevention(client_ip, data, action='register')
+        if not is_valid:
+            logger.warning(f"Bot registration attempt blocked from IP {client_ip}: {error_msg}")
+            return jsonify({'error': error_msg}), 429
+        logger.info(f"Bot prevention passed for registration from IP {client_ip}")
         
         # Get Supabase client
         supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -96,16 +108,12 @@ async def login():
     data = await request.get_json()
     
     try:
-        # Verify reCAPTCHA token (anti-bot)
-        recaptcha_token = data.get('recaptcha_token')
-        if recaptcha_token:
-            success, score, error = await verify_recaptcha(recaptcha_token, 'login')
-            if not success:
-                logger.warning(f"Bot login attempt blocked: {error}")
-                return jsonify({'error': 'Login failed. Please try again.'}), 403
-            logger.info(f"Login reCAPTCHA passed: score={score}")
-        else:
-            logger.warning("Login without reCAPTCHA token")
+        # Simple bot prevention (rate limiting)
+        client_ip = get_client_ip()
+        is_valid, error_msg = validate_bot_prevention(client_ip, data, action='login')
+        if not is_valid:
+            logger.warning(f"Bot login attempt blocked from IP {client_ip}: {error_msg}")
+            return jsonify({'error': error_msg}), 429
         
         # Authenticate with Supabase
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)

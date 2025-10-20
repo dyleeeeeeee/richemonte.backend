@@ -11,7 +11,7 @@ from .db_helpers import (
     insert_record,
     get_user_records
 )
-from .recaptcha import verify_recaptcha
+from .bot_prevention import validate_bot_prevention
 
 __all__ = [
     'generate_card_number',
@@ -25,5 +25,5 @@ __all__ = [
     'create_transaction_record',
     'insert_record',
     'get_user_records',
-    'verify_recaptcha'
+    'validate_bot_prevention'
 ]

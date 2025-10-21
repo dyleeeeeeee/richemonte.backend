@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 	role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user')),
 	account_status TEXT DEFAULT 'active' CHECK (account_status IN ('active', 'blocked', 'suspended')),
 	transactions_blocked BOOLEAN DEFAULT FALSE,
+	transaction_pin_hash TEXT,
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW()
 );

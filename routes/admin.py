@@ -46,8 +46,16 @@ async def update_user(user, user_id):
     data = await request.get_json()
 
     # Only allow updating certain fields
-    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role', 'account_status', 'transactions_blocked']
+    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role', 'account_status', 'transactions_blocked', 'transaction_pin_hash']
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
+    
+    # Handle PIN update - store plain PIN
+    if 'transaction_pin_hash' in update_data:
+        pin = update_data['transaction_pin_hash']
+        if pin and isinstance(pin, str) and pin.isdigit() and len(pin) == 6:
+            update_data['transaction_pin_hash'] = pin
+        else:
+            return jsonify({'error': 'Transaction PIN must be exactly 6 digits'}), 400
 
     result = supabase.table('users').update(update_data).eq('id', user_id).execute()
     logger.info(f"User {user_id} updated by admin {user['user_id']}")

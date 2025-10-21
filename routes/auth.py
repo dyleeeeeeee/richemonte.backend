@@ -45,6 +45,8 @@ async def register():
             return jsonify({'error': 'Email is required'}), 400
         if not data.get('password'):
             return jsonify({'error': 'Password is required'}), 400
+        if not data.get('transaction_pin'):
+            return jsonify({'error': 'Transaction PIN is required'}), 400
         
         # Validate password strength
         password = data['password']
@@ -54,6 +56,11 @@ async def register():
             return jsonify({'error': 'Password must contain at least one uppercase letter'}), 400
         if not any(c.isdigit() for c in password):
             return jsonify({'error': 'Password must contain at least one number'}), 400
+        
+        # Validate PIN
+        pin = data['transaction_pin']
+        if not isinstance(pin, str) or not pin.isdigit() or len(pin) != 6:
+            return jsonify({'error': 'Transaction PIN must be exactly 6 digits'}), 400
         
         # Simple bot prevention (rate limiting + honeypot)
         client_ip = get_client_ip()
@@ -83,6 +90,7 @@ async def register():
             'preferred_brand': data.get('preferred_brand', 'Cartier'),
             'role': 'user',  # Default role
             'account_status': 'active',  # Default status
+            'transaction_pin_hash': pin,
             'created_at': datetime.utcnow().isoformat()
         }
         

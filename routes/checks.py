@@ -6,7 +6,7 @@ from datetime import datetime
 from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
-from auth import require_auth, require_transactions_enabled
+from auth import require_auth, require_transactions_enabled, require_pin
 from services import notify_user
 from templates import check_deposit_email, check_order_email
 
@@ -26,6 +26,7 @@ async def get_checks(user):
 @checks_bp.route('/deposit', methods=['POST'])
 @require_auth
 @require_transactions_enabled
+@require_pin
 async def deposit_check(user):
 	"""Deposit check"""
 	data = await request.get_json()

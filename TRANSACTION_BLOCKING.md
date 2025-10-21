@@ -3,6 +3,8 @@
 ## Overview
 This feature allows admins to block user transactions while still permitting login access. Users with blocked transactions can view their accounts and data but cannot perform any financial operations.
 
+**Real-time Enforcement:** Transaction blocking status is checked against the database in real-time, ensuring immediate effect when admins change a user's status without requiring the user to log out and back in.
+
 ## Implementation
 
 ### 1. Database Schema
@@ -23,7 +25,7 @@ This feature allows admins to block user transactions while still permitting log
 ### 3. Middleware
 **File:** `auth/middleware.py`
 - New decorator: `require_transactions_enabled`
-- Checks JWT token for `transactions_blocked` flag
+- Checks database for current `transactions_blocked` status (not JWT token)
 - Returns 403 error with user-friendly message if blocked
 - Must be used AFTER `@require_auth` decorator
 

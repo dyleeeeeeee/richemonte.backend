@@ -67,6 +67,9 @@ def require_transactions_enabled(f):
 	for the most current status. User can login but cannot perform any 
 	financial transactions (transfers, bill payments, check deposits).
 	
+	NOTE: This decorator expects the user to already be injected by @require_auth.
+	Always use @require_auth before this decorator.
+	
 	Usage:
 		@app.route('/api/transfers')
 		@require_auth
@@ -76,11 +79,8 @@ def require_transactions_enabled(f):
 			return jsonify({'success': True})
 	"""
 	@wraps(f)
-	async def decorated_function(*args, **kwargs):
-		user = await get_current_user()
-		if not user:
-			return jsonify({'error': 'Unauthorized'}), 401
-		
+	async def decorated_function(user, *args, **kwargs):
+		# User is already provided by @require_auth, don't fetch again
 		# Query database for current transaction blocking status
 		from core import get_supabase_client
 		supabase = get_supabase_client()

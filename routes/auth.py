@@ -188,5 +188,35 @@ async def logout():
 @require_auth
 async def get_me(user):
     """Get current user profile"""
-    user_data = supabase.table('users').select('*').eq('id', user['user_id']).single().execute()
-    return jsonify(user_data.data)
+    try:
+        # .single() raises exception if no match, so we catch it
+        user_data = supabase.table('users').select('*').eq('id', user['user_id']).execute()
+        
+        if not user_data.data or len(user_data.data) == 0:
+            logger.error(f"User data not found in users table for user_id: {user['user_id']}")
+            # Create missing user record with data from JWT
+            logger.info(f"Creating missing user record for {user['user_id']}")
+            profile_data = {
+                'id': user['user_id'],
+                'email': user.get('email', ''),
+                'full_name': '',
+                'role': 'user',
+                'account_status': user.get('account_status', 'active'),
+                'created_at': datetime.utcnow().isoformat()
+            }
+            result = supabase.table('users').insert(profile_data).execute()
+            return jsonify(result.data[0])
+        
+        user_profile = user_data.data[0]
+        
+        # Ensure role field exists (default to 'user' if missing)
+        if 'role' not in user_profile or user_profile['role'] is None:
+            user_profile['role'] = 'user'
+            # Update database to fix missing role
+            supabase.table('users').update({'role': 'user'}).eq('id', user['user_id']).execute()
+        
+        logger.debug(f"User profile fetched for {user['user_id']}: role={user_profile.get('role')}, status={user_profile.get('account_status')}")
+        return jsonify(user_profile)
+    except Exception as e:
+        logger.error(f"Failed to fetch user profile for {user['user_id']}: {str(e)}")
+        return jsonify({'error': 'Failed to fetch user profile', 'details': str(e)}), 500

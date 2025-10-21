@@ -6,7 +6,7 @@ from datetime import datetime
 from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
-from auth import require_auth
+from auth import require_auth, require_transactions_enabled
 from utils import verify_account_ownership, check_sufficient_balance, update_account_balance, insert_record
 from services import notify_user
 from templates import bill_payment_email
@@ -67,6 +67,7 @@ async def add_bill(user):
 
 @bills_bp.route('/<bill_id>/pay', methods=['POST'])
 @require_auth
+@require_transactions_enabled
 async def pay_bill(user, bill_id):
 	"""Pay bill"""
 	data = await request.get_json()

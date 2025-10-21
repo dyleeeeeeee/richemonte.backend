@@ -46,7 +46,7 @@ async def update_user(user, user_id):
     data = await request.get_json()
 
     # Only allow updating certain fields
-    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role', 'account_status']
+    allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'role', 'account_status', 'transactions_blocked']
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
     result = supabase.table('users').update(update_data).eq('id', user_id).execute()
@@ -204,4 +204,42 @@ async def unblock_user(user, user_id):
     }).eq('id', user_id).execute()
 
     logger.info(f"User {user_id} unblocked by admin {user['user_id']}")
+    return jsonify(result.data[0])
+
+
+@admin_bp.route('/users/<user_id>/block-transactions', methods=['POST'])
+@require_auth
+async def block_user_transactions(user, user_id):
+    """Block user transactions while allowing login (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    # Prevent admin from blocking their own transactions
+    if user_id == user['user_id']:
+        return jsonify({'error': 'Cannot block your own transactions'}), 400
+
+    result = supabase.table('users').update({
+        'transactions_blocked': True,
+        'updated_at': datetime.utcnow().isoformat()
+    }).eq('id', user_id).execute()
+
+    logger.info(f"User {user_id} transactions blocked by admin {user['user_id']}")
+    return jsonify(result.data[0])
+
+
+@admin_bp.route('/users/<user_id>/unblock-transactions', methods=['POST'])
+@require_auth
+async def unblock_user_transactions(user, user_id):
+    """Unblock user transactions (admin only)"""
+    admin_check = require_admin(user)
+    if admin_check:
+        return admin_check
+
+    result = supabase.table('users').update({
+        'transactions_blocked': False,
+        'updated_at': datetime.utcnow().isoformat()
+    }).eq('id', user_id).execute()
+
+    logger.info(f"User {user_id} transactions unblocked by admin {user['user_id']}")
     return jsonify(result.data[0])

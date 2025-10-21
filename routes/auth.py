@@ -99,12 +99,13 @@ async def register():
             html
         )
         
-        # Create JWT token with role and status
+        # Create JWT token with role, status, and transaction blocking status
         token = create_jwt_token(
             auth_response.user.id, 
             data['email'],
             role='user',
-            account_status='active'
+            account_status='active',
+            transactions_blocked=False
         )
         
         logger.info(f"User registered successfully: {data['email']}")
@@ -158,12 +159,13 @@ async def login():
             logger.warning(f"Suspended user login attempt: {data['email']}")
             return jsonify({'error': 'Your account has been suspended. Please contact Concierge Bank support for assistance.'}), 403
         
-        # Create JWT token with role and account status
+        # Create JWT token with role, account status, and transaction blocking status
         token = create_jwt_token(
             auth_response.user.id,
             data['email'],
             role=user_data.data.get('role', 'user'),
-            account_status=account_status
+            account_status=account_status,
+            transactions_blocked=user_data.data.get('transactions_blocked', False)
         )
         
         logger.info(f"User logged in: {data['email']}")

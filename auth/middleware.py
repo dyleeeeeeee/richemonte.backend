@@ -55,3 +55,34 @@ def require_auth(f):
 		
 		return await f(user, *args, **kwargs)
 	return decorated_function
+
+
+def require_transactions_enabled(f):
+	"""Decorator to require transactions to be enabled for routes
+	
+	This checks if user's transactions are blocked. User can login but cannot
+	perform any financial transactions (transfers, bill payments, check deposits).
+	
+	Usage:
+		@app.route('/api/transfers')
+		@require_auth
+		@require_transactions_enabled
+		async def create_transfer(user):
+			# Only executes if transactions are not blocked
+			return jsonify({'success': True})
+	"""
+	@wraps(f)
+	async def decorated_function(*args, **kwargs):
+		user = await get_current_user()
+		if not user:
+			return jsonify({'error': 'Unauthorized'}), 401
+		
+		# Check if transactions are blocked
+		transactions_blocked = user.get('transactions_blocked', False)
+		if transactions_blocked:
+			return jsonify({
+				'error': 'Your transactions have been temporarily blocked. Please contact Concierge Bank support for assistance.'
+			}), 403
+		
+		return await f(user, *args, **kwargs)
+	return decorated_function

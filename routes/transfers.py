@@ -6,7 +6,7 @@ from datetime import datetime
 from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
-from auth import require_auth
+from auth import require_auth, require_transactions_enabled
 from utils import verify_account_ownership, check_sufficient_balance, update_account_balance, create_transaction_record
 from services import notify_user
 from templates import transfer_confirmation_email
@@ -30,6 +30,7 @@ async def get_transfers(user):
 
 @transfers_bp.route('', methods=['POST'])
 @require_auth
+@require_transactions_enabled
 async def create_transfer(user):
 	"""Create transfer with full validation and proper handling"""
 	data = await request.get_json()

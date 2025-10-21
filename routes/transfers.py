@@ -223,6 +223,57 @@ async def create_transfer(user):
 			'transfer'
 		)
 	
+	# For P2P transfers, check if recipient exists in system and auto-credit if they do
+	if transfer_type == 'p2p':
+		recipient_email = data.get('to_external', {}).get('email', '').lower()
+		recipient_phone = data.get('to_external', {}).get('phone', '')
+		
+		# Try to find recipient user by email or phone
+		recipient_user = None
+		if recipient_email:
+			recipient_result = supabase.table('users').select('id, email').eq('email', recipient_email).execute()
+			if recipient_result.data:
+				recipient_user = recipient_result.data[0]
+		elif recipient_phone:
+			recipient_result = supabase.table('users').select('id, phone').eq('phone', recipient_phone).execute()
+			if recipient_result.data:
+				recipient_user = recipient_result.data[0]
+		
+		# If recipient exists, auto-complete the transfer to their primary account
+		if recipient_user:
+			# Get recipient's primary (first) account
+			recipient_accounts = supabase.table('accounts').select('*').eq('user_id', recipient_user['id']).limit(1).execute()
+			
+			if recipient_accounts.data:
+				recipient_account = recipient_accounts.data[0]
+				
+				# Credit recipient's account
+				new_recipient_balance = recipient_account['balance'] + amount
+				await update_account_balance(supabase, recipient_account['id'], new_recipient_balance)
+				
+				# Create credit transaction for recipient
+				await create_transaction_record(
+					supabase,
+					recipient_account['id'],
+					'credit',
+					amount,
+					f"P2P transfer from {user.get('email', 'another user')}",
+					'transfer'
+				)
+				
+				# Update transfer status to completed and link recipient account
+				supabase.table('transfers').update({
+					'status': 'completed',
+					'to_account_id': recipient_account['id']
+				}).eq('id', result.data[0]['id']).execute()
+				
+				logger.info(f"P2P transfer auto-completed for registered user {recipient_user['id']}")
+				status = 'completed'
+			else:
+				logger.warning(f"Recipient user {recipient_user['id']} has no accounts")
+		else:
+			logger.info(f"P2P recipient not found in system - transfer remains pending")
+	
 	# Send email notification
 	html = transfer_confirmation_email(
 		amount, 

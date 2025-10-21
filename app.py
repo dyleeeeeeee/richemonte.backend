@@ -75,14 +75,9 @@ def create_app():
 		from quart import request
 		logger.debug(f">>> REQUEST: {request.method} {request.path}")
 		logger.debug(f"    Headers: {dict(request.headers)}")
-		if request.method in ['POST', 'PUT', 'PATCH']:
-			try:
-				body = await request.get_json()
-				# Redact sensitive fields
-				safe_body = {k: '***REDACTED***' if k in ['password', 'token', 'secret'] else v for k, v in (body or {}).items()}
-				logger.debug(f"    Body: {safe_body}")
-			except Exception:
-				pass
+		# Note: We don't log the request body here because reading it would
+		# consume the stream, making it unavailable for the route handler.
+		# Body logging should be done within route handlers if needed.
 	
 	@app.after_request
 	async def log_response(response):

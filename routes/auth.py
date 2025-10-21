@@ -230,3 +230,32 @@ async def get_me(user):
     except Exception as e:
         logger.error(f"Failed to fetch user profile for {user['user_id']}: {str(e)}")
         return jsonify({'error': 'Failed to fetch user profile', 'details': str(e)}), 500
+
+
+@auth_bp.route('/set-pin', methods=['POST'])
+@require_auth
+async def set_transaction_pin(user):
+    """Set or update transaction PIN for authenticated user"""
+    try:
+        data = await request.get_json()
+        new_pin = data.get('transaction_pin')
+        
+        if not new_pin:
+            return jsonify({'error': 'Transaction PIN is required'}), 400
+        
+        # Validate PIN format
+        if not isinstance(new_pin, str) or not new_pin.isdigit() or len(new_pin) != 6:
+            return jsonify({'error': 'Transaction PIN must be exactly 6 digits'}), 400
+        
+        # Update PIN in database (stored as plain text for this implementation)
+        supabase.table('users').update({
+            'transaction_pin_hash': new_pin,
+            'updated_at': datetime.utcnow().isoformat()
+        }).eq('id', user['user_id']).execute()
+        
+        logger.info(f"Transaction PIN set/updated for user {user['user_id']}")
+        return jsonify({'message': 'Transaction PIN set successfully'}), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to set PIN for user {user['user_id']}: {str(e)}")
+        return jsonify({'error': 'Failed to set transaction PIN', 'details': str(e)}), 500

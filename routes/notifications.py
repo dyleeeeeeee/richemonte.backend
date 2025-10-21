@@ -14,7 +14,7 @@ supabase = get_supabase_client()
 @require_auth
 async def get_notifications(user):
 	"""Get user notifications"""
-	notifications = supabase.table('notifications').select('*').eq('user_id', user['user_id']).order('created_at', desc=True).limit(50).execute()
+	notifications = supabase.table('notifications').select('*').eq('user_id', user['user_id']).eq('delivery_method', 'push').order('created_at', desc=True).limit(50).execute()
 	return jsonify(notifications.data)
 
 

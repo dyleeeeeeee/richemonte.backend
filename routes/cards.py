@@ -31,6 +31,26 @@ async def apply_card(user):
 	"""Apply for new card"""
 	data = await request.get_json()
 	
+	# Validate required fields
+	if not data.get('card_type'):
+		return jsonify({'error': 'Card type is required'}), 400
+	
+	# Validate card type
+	valid_card_types = ['Debit', 'Credit', 'Platinum', 'Black Card']
+	if data['card_type'] not in valid_card_types:
+		return jsonify({'error': f'Invalid card type. Must be one of: {", ".join(valid_card_types)}'}), 400
+	
+	# Validate credit limit
+	try:
+		credit_limit = float(data.get('credit_limit', 10000))
+	except (ValueError, TypeError):
+		return jsonify({'error': 'Invalid credit limit format'}), 400
+	
+	if credit_limit < 1000:
+		return jsonify({'error': 'Credit limit must be at least $1,000'}), 400
+	if credit_limit > 1000000:
+		return jsonify({'error': 'Credit limit cannot exceed $1,000,000'}), 400
+	
 	card_number = generate_card_number()
 	cvv = generate_cvv()
 	
@@ -41,7 +61,7 @@ async def apply_card(user):
 		'card_brand': data.get('card_brand', 'Cartier'),
 		'cvv': cvv,
 		'expiry_date': (datetime.utcnow() + timedelta(days=CARD_EXPIRY_DAYS)).strftime('%m/%y'),
-		'credit_limit': float(data.get('credit_limit', 10000)),
+		'credit_limit': credit_limit,
 		'balance': 0,
 		'status': 'approved',
 		'created_at': datetime.utcnow().isoformat()
@@ -217,7 +237,7 @@ async def resolve_card_issue_report(user, report_id):
 			'card_replaced',
 			'Your card has been replaced and is now active.',
 			'New Card Issued',
-			f'<p>Your new card ending in ****{new_card_number[-4:]} is now active.</p><p>CVV: {new_cvv}</p><p>Please update any recurring payments with the new card details.</p>'
+			f'<p>Your new card ending in ****{new_card_number[-4:]} is now active and will arrive within 3-5 business days.</p><p>Your CVV and card details are available in your dashboard under Cards.</p><p>Please update any recurring payments with the new card details.</p>'
 		)
 
 	logger.info(f"Card issue report {report_id} resolved by admin {user['user_id']}: {action}")

@@ -31,17 +31,44 @@ async def add_beneficiary(user):
 	data = await request.get_json()
 	
 	try:
+		# Validate required fields
+		if not data.get('full_name'):
+			return jsonify({'error': 'Full name is required'}), 400
+		if not data.get('relationship'):
+			return jsonify({'error': 'Relationship is required'}), 400
+		if 'percentage' not in data:
+			return jsonify({'error': 'Percentage is required'}), 400
+		
+		# Validate percentage
+		try:
+			percentage = float(data['percentage'])
+		except (ValueError, TypeError):
+			return jsonify({'error': 'Invalid percentage format'}), 400
+		
+		if percentage <= 0 or percentage > 100:
+			return jsonify({'error': 'Percentage must be between 0 and 100'}), 400
+		
+		# Check total percentage doesn't exceed 100%
+		existing = supabase.table('beneficiaries').select('percentage').eq('user_id', user['user_id']).execute()
+		total_percentage = sum(float(b['percentage']) for b in existing.data) + percentage
+		if total_percentage > 100:
+			return jsonify({'error': f'Total beneficiary percentage would exceed 100% (currently at {total_percentage - percentage}%)'}), 400
+		
+		# Validate contact info (at least one required)
+		if not data.get('email') and not data.get('phone'):
+			return jsonify({'error': 'Email or phone number is required'}), 400
+		
 		beneficiary_data = {
 			'user_id': user['user_id'],
-			'full_name': data['full_name'],
-			'relationship': data['relationship'],
-			'email': data.get('email'),
-			'phone': data.get('phone'),
-			'percentage': data['percentage']
+			'full_name': data['full_name'].strip(),
+			'relationship': data['relationship'].strip(),
+			'email': data.get('email', '').strip() or None,
+			'phone': data.get('phone', '').strip() or None,
+			'percentage': percentage
 		}
 		
 		result = supabase.table('beneficiaries').insert(beneficiary_data).execute()
-		logger.info(f"Beneficiary added for user {user['user_id']}")
+		logger.info(f"Beneficiary added for user {user['user_id']}: {percentage}%")
 		return jsonify(result.data[0])
 	except Exception as e:
 		logger.error(f"Add beneficiary error: {str(e)}")

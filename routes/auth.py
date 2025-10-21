@@ -40,6 +40,21 @@ async def register():
     data = await request.get_json()
     
     try:
+        # Validate required fields
+        if not data.get('email'):
+            return jsonify({'error': 'Email is required'}), 400
+        if not data.get('password'):
+            return jsonify({'error': 'Password is required'}), 400
+        
+        # Validate password strength
+        password = data['password']
+        if len(password) < 8:
+            return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+        if not any(c.isupper() for c in password):
+            return jsonify({'error': 'Password must contain at least one uppercase letter'}), 400
+        if not any(c.isdigit() for c in password):
+            return jsonify({'error': 'Password must contain at least one number'}), 400
+        
         # Simple bot prevention (rate limiting + honeypot)
         client_ip = get_client_ip()
         is_valid, error_msg = validate_bot_prevention(client_ip, data, action='register')
@@ -66,6 +81,8 @@ async def register():
             'phone': data.get('phone', ''),
             'address': data.get('address', ''),
             'preferred_brand': data.get('preferred_brand', 'Cartier'),
+            'role': 'user',  # Default role
+            'account_status': 'active',  # Default status
             'created_at': datetime.utcnow().isoformat()
         }
         
@@ -82,8 +99,13 @@ async def register():
             html
         )
         
-        # Create JWT token
-        token = create_jwt_token(auth_response.user.id, data['email'])
+        # Create JWT token with role and status
+        token = create_jwt_token(
+            auth_response.user.id, 
+            data['email'],
+            role='user',
+            account_status='active'
+        )
         
         logger.info(f"User registered successfully: {data['email']}")
         return jsonify({
@@ -136,8 +158,13 @@ async def login():
             logger.warning(f"Suspended user login attempt: {data['email']}")
             return jsonify({'error': 'Your account has been suspended. Please contact Concierge Bank support for assistance.'}), 403
         
-        # Create JWT token and return user data
-        token = create_jwt_token(auth_response.user.id, data['email'])
+        # Create JWT token with role and account status
+        token = create_jwt_token(
+            auth_response.user.id,
+            data['email'],
+            role=user_data.data.get('role', 'user'),
+            account_status=account_status
+        )
         
         logger.info(f"User logged in: {data['email']}")
         return jsonify({

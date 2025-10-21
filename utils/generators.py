@@ -21,12 +21,14 @@ def generate_card_number(prefix: str = '4') -> str:
 
 
 def generate_account_number() -> str:
-	"""Generate unique 12-digit account number
-	
-	Returns:
-		12-digit account number as string
+	"""Generate unique 12-digit account number with timestamp to avoid collisions
+	Format: [3-digit prefix][6-digit timestamp][3-digit random]
 	"""
-	return ''.join([str(random.randint(0, 9)) for _ in range(ACCOUNT_NUMBER_LENGTH)])
+	import time
+	prefix = random.randint(100, 999)  # Bank prefix
+	timestamp = int(time.time() * 1000) % 1000000  # Last 6 digits of millisecond timestamp
+	suffix = random.randint(100, 999)  # Random suffix
+	return f"{prefix}{timestamp:06d}{suffix}"
 
 
 def generate_cvv() -> str:

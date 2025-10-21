@@ -544,49 +544,81 @@ def card_approved_email(card_brand: str, card_type: str, card_last_four: str, cr
     )
 
 
-def transfer_confirmation_email(amount: float, new_balance: float) -> str:
-    """Professional transfer confirmation email"""
+def transfer_confirmation_email(amount: float, new_balance: float, recipient_name: str = 'account', transfer_type: str = 'internal', status: str = 'completed') -> str:
+    """Professional transfer confirmation email with full details"""
+    
+    # Determine status display and processing time
+    status_display = 'Completed' if status == 'completed' else 'Pending'
+    status_emoji = '✅' if status == 'completed' else '⏳'
+    
+    if transfer_type == 'internal':
+        processing_time = 'Instant'
+        processing_note = 'Funds are available immediately in both accounts.'
+    elif transfer_type == 'external':
+        processing_time = '1-3 Business Days'
+        processing_note = 'External transfers typically complete within 1-3 business days via ACH.'
+    else:  # p2p
+        processing_time = 'Pending Recipient'
+        processing_note = 'The recipient will be notified and must accept the transfer.'
+    
+    hero_title = f"Transfer {status_display}"
+    title_text = "Transfer Completed Successfully" if status == 'completed' else "Transfer Initiated"
+    message_text = f"Your transfer has been processed and is {status}. " + processing_note
 
     content_html = f"""
-                            <h3 class="content-title">Transfer Completed Successfully</h3>
+                            <h3 class="content-title">{title_text}</h3>
 
                             <p class="content-text">
-                                Your transfer has been processed successfully. The funds are now available in your account.
+                                {message_text}
                             </p>
 
                             <div class="transaction-details">
                                 <h4 class="transaction-title">💸 Transfer Summary</h4>
                                 <div class="transaction-item">
+                                    <div class="transaction-label">Recipient:</div>
+                                    <div class="transaction-value">{recipient_name}</div>
+                                </div>
+                                <div class="transaction-item">
                                     <div class="transaction-label">Transfer Amount:</div>
                                     <div class="transaction-value">${amount:,.2f}</div>
                                 </div>
                                 <div class="transaction-item">
-                                    <div class="transaction-label">New Balance:</div>
+                                    <div class="transaction-label">Your New Balance:</div>
                                     <div class="transaction-value">${new_balance:,.2f}</div>
                                 </div>
                                 <div class="transaction-item">
+                                    <div class="transaction-label">Transfer Type:</div>
+                                    <div class="transaction-value">{transfer_type.replace('_', ' ').title()}</div>
+                                </div>
+                                <div class="transaction-item">
+                                    <div class="transaction-label">Status:</div>
+                                    <div class="transaction-value">{status_emoji} {status_display}</div>
+                                </div>
+                                <div class="transaction-item">
                                     <div class="transaction-label">Processing Time:</div>
-                                    <div class="transaction-value">Instant</div>
+                                    <div class="transaction-value">{processing_time}</div>
                                 </div>
                             </div>
 
                             <div class="info-box">
                                 <h4 class="info-title">🔒 Security & Tracking</h4>
                                 <p class="info-text">
-                                    All transfers are secured with bank-level encryption. Track your transaction history
-                                    and set up spending alerts in your dashboard for complete peace of mind.
+                                    All transfers are secured with bank-level 256-bit encryption and multi-factor authentication. 
+                                    Track your transaction history and set up spending alerts in your dashboard for complete peace of mind.
                                 </p>
                             </div>"""
 
     app_url = os.environ.get('NEXT_PUBLIC_APP_URL', 'https://conciergebank.us')
+    
+    footer_note = "Your transfer has been completed. Funds are available immediately." if status == 'completed' else f"Your transfer is {status}. {processing_note}"
 
     return base_email_template(
         title="Transfer Confirmation",
-        hero_title="Transfer Completed",
+        hero_title=hero_title,
         content_html=content_html,
         cta_text="View Transaction History",
-        cta_url=f"{app_url}/dashboard/transactions",
-        footer_text="Your transfer has been completed. Funds are available immediately."
+        cta_url=f"{app_url}/dashboard/accounts",
+        footer_text=footer_note
     )
 
 

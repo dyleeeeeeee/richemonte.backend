@@ -30,12 +30,31 @@ async def add_bill(user):
 	"""Add bill payee"""
 	data = await request.get_json()
 	
+	# Validate required fields
+	if not data.get('payee_name'):
+		return jsonify({'error': 'Payee name is required'}), 400
+	if not data.get('due_date'):
+		return jsonify({'error': 'Due date is required'}), 400
+	
+	# Validate amount
+	amount = float(data.get('amount', 0))
+	if amount <= 0:
+		return jsonify({'error': 'Amount must be greater than 0'}), 400
+	if amount > 1000000:
+		return jsonify({'error': 'Amount exceeds maximum limit'}), 400
+	
+	# Validate bill type
+	valid_bill_types = ['utility', 'credit_card', 'insurance', 'loan', 'rent', 'subscription', 'other']
+	bill_type = data.get('bill_type', 'utility')
+	if bill_type not in valid_bill_types:
+		return jsonify({'error': f'Invalid bill type. Must be one of: {", ".join(valid_bill_types)}'}), 400
+	
 	bill_data = {
 		'user_id': user['user_id'],
-		'payee_name': data['payee_name'],
-		'account_number': data.get('account_number', ''),
-		'bill_type': data.get('bill_type', 'utility'),
-		'amount': float(data['amount']),
+		'payee_name': data['payee_name'].strip(),
+		'account_number': data.get('account_number', '').strip(),
+		'bill_type': bill_type,
+		'amount': amount,
 		'due_date': data['due_date'],
 		'auto_pay': data.get('auto_pay', False),
 		'created_at': datetime.utcnow().isoformat()
@@ -82,6 +101,16 @@ async def pay_bill(user, bill_id):
 	# Update account balance
 	new_balance = account_data['balance'] - float(data['amount'])
 	await update_account_balance(supabase, data['account_id'], new_balance)
+	
+	# Create transaction record for bill payment
+	await create_transaction_record(
+		supabase,
+		data['account_id'],
+		'debit',
+		float(data['amount']),
+		f"Bill payment to {bill.data['payee_name']}",
+		'bill_payment'
+	)
 	
 	# Send notification
 	html = bill_payment_email(

@@ -129,24 +129,74 @@ async def send_notification_to_user(user):
         return admin_check
 
     data = await request.get_json()
+    
+    # Validate required fields
+    if not data.get('user_id'):
+        return jsonify({'error': 'User ID is required'}), 400
+    if not data.get('message'):
+        return jsonify({'error': 'Message is required'}), 400
 
+    notification_type = data.get('type', 'admin_message')
+    message = data['message']
+    target_user_id = data['user_id']
+    
+    # Create notification title based on type
+    title_map = {
+        'admin_message': 'Admin Message',
+        'account_alert': 'Account Alert',
+        'security': 'Security Notice',
+        'transaction': 'Transaction Update'
+    }
+    title = title_map.get(notification_type, 'Notification')
+
+    # Create in-app notification
     notification_data = {
-        'user_id': data['user_id'],
-        'type': data.get('type', 'admin_message'),
-        'message': data['message'],
-        'delivery_method': data.get('delivery_method', 'push'),
+        'user_id': target_user_id,
+        'type': notification_type,
+        'title': title,
+        'message': message,
+        'delivery_method': 'push',
         'read': False,
         'created_at': datetime.utcnow().isoformat()
     }
 
     result = supabase.table('notifications').insert(notification_data).execute()
+    
+    if not result.data:
+        logger.error(f"Failed to create notification for user {target_user_id}")
+        return jsonify({'error': 'Failed to create notification'}), 500
 
     # Send email notification if requested
     if data.get('send_email', False):
-        # Here you would implement email sending logic
-        logger.info(f"Email notification sent to user {data['user_id']} by admin {user['user_id']}")
+        try:
+            # Generate HTML email content
+            email_html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #d4af37 0%, #c5a028 100%); padding: 30px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">{title}</h1>
+                </div>
+                <div style="background: white; padding: 30px; border: 1px solid #e0e0e0;">
+                    <p style="color: #333; font-size: 16px; line-height: 1.6;">{message}</p>
+                    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+                    <p style="color: #666; font-size: 14px;">This is an administrative notification from Concierge Bank.</p>
+                </div>
+            </div>
+            """
+            
+            await notify_user(
+                supabase,
+                target_user_id,
+                notification_type,
+                message,
+                title,
+                email_html
+            )
+            logger.info(f"Email notification sent to user {target_user_id} by admin {user['user_id']}")
+        except Exception as e:
+            logger.error(f"Failed to send email notification to user {target_user_id}: {e}")
+            # Don't fail the request if email fails, notification was still created
 
-    logger.info(f"Notification sent to user {data['user_id']} by admin {user['user_id']}: {data['title']}")
+    logger.info(f"Notification sent to user {target_user_id} by admin {user['user_id']}: {message[:50]}")
     return jsonify(result.data[0]), 201
 
 

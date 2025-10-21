@@ -19,10 +19,49 @@ supabase = get_supabase_client()
 @transfers_bp.route('', methods=['GET'])
 @require_auth
 async def get_transfers(user):
-	"""Get user's transfer history"""
+	"""Get user's transfer history - includes sent and received transfers"""
 	try:
-		transfers = supabase.table('transfers').select('*').eq('user_id', user['user_id']).order('created_at', desc=True).execute()
-		return jsonify(transfers.data)
+		# Get current user's email and phone for P2P matching
+		user_data = supabase.table('users').select('email, phone').eq('id', user['user_id']).single().execute()
+		user_email = user_data.data.get('email') if user_data.data else None
+		user_phone = user_data.data.get('phone') if user_data.data else None
+		
+		# Get transfers where user is the sender
+		sent_transfers = supabase.table('transfers').select('*').eq('user_id', user['user_id']).execute()
+		
+		# Get all P2P transfers to check if any are addressed to this user
+		all_p2p_transfers = supabase.table('transfers').select('*').eq('transfer_type', 'p2p').execute()
+		
+		# Filter P2P transfers received by this user (matching email or phone)
+		received_transfers = []
+		if all_p2p_transfers.data:
+			for transfer in all_p2p_transfers.data:
+				# Skip if this user sent it (already in sent_transfers)
+				if transfer.get('user_id') == user['user_id']:
+					continue
+					
+				to_external = transfer.get('to_external', {})
+				recipient_email = to_external.get('email', '').lower() if to_external.get('email') else None
+				recipient_phone = to_external.get('phone', '').strip() if to_external.get('phone') else None
+				
+				# Check if transfer is addressed to this user's email or phone
+				if (user_email and recipient_email and recipient_email == user_email.lower()) or \
+				   (user_phone and recipient_phone and recipient_phone == user_phone):
+					# Mark this as received transfer for display purposes
+					transfer['direction'] = 'received'
+					received_transfers.append(transfer)
+		
+		# Combine sent and received transfers
+		all_transfers = (sent_transfers.data or []) + received_transfers
+		
+		# Sort by created_at descending
+		all_transfers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+		
+		logger.info(f"Fetched {len(sent_transfers.data or [])} sent and {len(received_transfers)} received transfers for user {user['user_id']}")
+		if all_transfers:
+			logger.debug(f"Transfer types: {[t.get('transfer_type') for t in all_transfers[:5]]}")
+		
+		return jsonify(all_transfers)
 	except Exception as e:
 		logger.error(f"Failed to fetch transfers for user {user['user_id']}: {e}")
 		return jsonify({'error': 'Failed to fetch transfer history'}), 500
@@ -149,7 +188,10 @@ async def create_transfer(user):
 		'created_at': datetime.utcnow().isoformat()
 	}
 	
+	logger.info(f"Creating transfer: type={transfer_type}, user={user['user_id']}, amount=${amount}, to={recipient_name}")
+	logger.debug(f"Transfer data: {transfer_data}")
 	result = supabase.table('transfers').insert(transfer_data).execute()
+	logger.info(f"Transfer created with ID: {result.data[0]['id'] if result.data else 'unknown'}")
 	
 	# Debit source account
 	new_from_balance = from_account['balance'] - amount

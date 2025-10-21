@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	user_id UUID REFERENCES users(id) ON DELETE CASCADE,
 	type TEXT NOT NULL,
+	title TEXT,
 	message TEXT NOT NULL,
 	delivery_method TEXT, -- email, sms, push
 	read BOOLEAN DEFAULT FALSE,

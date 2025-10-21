@@ -6,8 +6,8 @@ from datetime import datetime
 from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
-from auth import require_auth, require_transactions_enabled, require_pin
-from utils import verify_account_ownership, check_sufficient_balance, update_account_balance, insert_record
+from auth import require_auth, require_transactions_enabled
+from utils import verify_account_ownership, check_sufficient_balance, update_account_balance, insert_record, create_transaction_record
 from services import notify_user
 from templates import bill_payment_email
 
@@ -68,10 +68,32 @@ async def add_bill(user):
 @bills_bp.route('/<bill_id>/pay', methods=['POST'])
 @require_auth
 @require_transactions_enabled
-@require_pin
 async def pay_bill(user, bill_id):
 	"""Pay bill"""
 	data = await request.get_json()
+	
+	# Verify PIN first
+	provided_pin = data.get('pin')
+	if not provided_pin:
+		return jsonify({'error': 'Transaction PIN is required'}), 400
+	
+	if not isinstance(provided_pin, str) or not provided_pin.isdigit() or len(provided_pin) != 6:
+		return jsonify({'error': 'Transaction PIN must be exactly 6 digits'}), 400
+	
+	# Verify PIN against database
+	try:
+		user_data = supabase.table('users').select('transaction_pin_hash').eq('id', user['user_id']).single().execute()
+		stored_hash = user_data.data.get('transaction_pin_hash') if user_data.data else None
+		
+		if not stored_hash:
+			return jsonify({'error': 'Transaction PIN not set. Please contact support.'}), 400
+		
+		# Verify PIN - compare plain text
+		if provided_pin != stored_hash:
+			return jsonify({'error': 'Invalid transaction PIN'}), 403
+	except Exception as e:
+		logger.error(f"Failed to verify PIN for user {user['user_id']}: {e}")
+		return jsonify({'error': 'PIN verification failed. Please try again.'}), 500
 	
 	# Verify bill ownership
 	bill = supabase.table('bills').select('*').eq('id', bill_id).eq('user_id', user['user_id']).single().execute()

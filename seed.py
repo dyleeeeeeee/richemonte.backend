@@ -1,8 +1,19 @@
 """
-Concierge Bank - Seed Script with Failsafes
-Generates realistic historical banking data. Linus-approved: no bullshit, just working code.
+Concierge Bank - Enhanced Seed Script with Wealth Context
+Generates realistic historical banking data with customizable transaction magnitudes.
 
-Usage: python seed.py --email user@example.com --months 6
+Usage Examples:
+  python seed.py --email user@example.com --months 6
+  python seed.py --email user@example.com --wealth-context wealthy
+  python seed.py --email user@example.com --target-balance 34000000
+  python seed.py --email user@example.com --wealth-context ultra --months 12
+
+Wealth Contexts:
+  modest    - $50K default balance, everyday transactions
+  standard  - $250K default balance, mixed regular/luxury spending  
+  affluent  - $2M default balance, frequent luxury purchases
+  wealthy   - $10M default balance, high-value transactions
+  ultra     - $50M default balance, ultra-high-net-worth patterns
 """
 import argparse
 import random
@@ -16,7 +27,114 @@ fake = Faker()
 supabase = get_supabase_client()
 
 
-def get_or_create_accounts(user_id: str) -> list:
+class WealthContext:
+	"""Wealth context configuration for realistic transaction generation"""
+	
+	def __init__(self, context_type: str = 'standard', target_balance: float = None):
+		self.context_type = context_type
+		self.target_balance = target_balance or self._get_default_balance(context_type)
+		self.config = self._get_config(context_type)
+	
+	def _get_default_balance(self, context_type: str) -> float:
+		"""Get default target balance for context type"""
+		balances = {
+			'modest': 50000,
+			'standard': 250000,
+			'affluent': 2000000,
+			'wealthy': 10000000,
+			'ultra': 50000000
+		}
+		return balances.get(context_type, 250000)
+	
+	def _get_config(self, context_type: str) -> dict:
+		"""Get transaction configuration based on wealth context"""
+		configs = {
+			'modest': {
+				'account_balance_ranges': {
+					'Checking': (1000, 15000),
+					'Savings': (2000, 30000),
+					'Investment': (5000, 50000)
+				},
+				'salary_range': (3000, 8000),
+				'regular_transaction_range': (5, 200),
+				'luxury_transaction_range': (200, 2000),
+				'utility_range': (50, 200),
+				'transfer_range': (50, 2000),
+				'luxury_frequency': 0.05,
+				'card_limits': {'Credit': 5000, 'Debit': 0}
+			},
+			'standard': {
+				'account_balance_ranges': {
+					'Checking': (1000, 25000),
+					'Savings': (5000, 75000),
+					'Investment': (10000, 150000)
+				},
+				'salary_range': (5000, 15000),
+				'regular_transaction_range': (10, 500),
+				'luxury_transaction_range': (500, 8000),
+				'utility_range': (100, 400),
+				'transfer_range': (100, 5000),
+				'luxury_frequency': 0.15,
+				'card_limits': {'Credit': 25000, 'Debit': 0}
+			},
+			'affluent': {
+				'account_balance_ranges': {
+					'Checking': (5000, 100000),
+					'Savings': (25000, 500000),
+					'Investment': (100000, 2000000)
+				},
+				'salary_range': (15000, 50000),
+				'regular_transaction_range': (25, 1500),
+				'luxury_transaction_range': (2000, 25000),
+				'utility_range': (200, 1000),
+				'transfer_range': (500, 25000),
+				'luxury_frequency': 0.25,
+				'card_limits': {'Credit': 100000, 'Debit': 0}
+			},
+			'wealthy': {
+				'account_balance_ranges': {
+					'Checking': (10000, 500000),
+					'Savings': (100000, 2000000),
+					'Investment': (500000, 10000000)
+				},
+				'salary_range': (25000, 150000),
+				'regular_transaction_range': (50, 5000),
+				'luxury_transaction_range': (5000, 100000),
+				'utility_range': (500, 3000),
+				'transfer_range': (1000, 100000),
+				'luxury_frequency': 0.35,
+				'card_limits': {'Credit': 500000, 'Debit': 0}
+			},
+			'ultra': {
+				'account_balance_ranges': {
+					'Checking': (25000, 2000000),
+					'Savings': (500000, 10000000),
+					'Investment': (2000000, 50000000)
+				},
+				'salary_range': (50000, 500000),
+				'regular_transaction_range': (100, 10000),
+				'luxury_transaction_range': (10000, 1000000),
+				'utility_range': (1000, 10000),
+				'transfer_range': (5000, 1000000),
+				'luxury_frequency': 0.45,
+				'card_limits': {'Credit': 2000000, 'Debit': 0}
+			}
+		}
+		return configs.get(context_type, configs['standard'])
+	
+	def scale_to_target(self, current_total: float) -> float:
+		"""Get scaling factor to reach target balance"""
+		if self.target_balance <= 0:
+			return 1.0
+		return self.target_balance / max(current_total, 1)
+	
+	def get_scaled_range(self, base_range: tuple, scale_factor: float = 1.0) -> tuple:
+		"""Get scaled transaction range"""
+		min_val, max_val = base_range
+		return (min_val * scale_factor, max_val * scale_factor)
+
+
+def get_or_create_accounts(user_id: str, wealth_context: WealthContext) -> list:
 	"""Get existing accounts or create new ones with FAILSAFE
 	
 	Failsafe: Checks if accounts exist first. If not, creates 3 realistic ones
@@ -29,6 +147,10 @@ def get_or_create_accounts(user_id: str) -> list:
 		print(f"Found {len(existing.data)} existing accounts")
 		return existing.data
 	
+	# Calculate scaling factor to reach target balance
+	estimated_total = sum(rng[1] for rng in wealth_context.config['account_balance_ranges'].values())
+	scale_factor = wealth_context.scale_to_target(estimated_total)
+	
 	# Create new accounts with realistic timing
 	print("No accounts found. Creating new ones...")
 	account_types = ['Checking', 'Savings', 'Investment']
@@ -40,11 +162,17 @@ def get_or_create_accounts(user_id: str) -> list:
 		days_ago = 365 - (i * 180)  # Investment: 365 days, Savings: 185 days, Checking: 5 days
 		created_at = base_date - timedelta(days=days_ago)
 		
+		# Get scaled balance range
+		balance_range = wealth_context.get_scaled_range(
+			wealth_context.config['account_balance_ranges'][acc_type],
+			scale_factor
+		)
+		
 		account_data = {
 			'user_id': user_id,
 			'account_number': generate_account_number(),
 			'account_type': acc_type,
-			'balance': round(random.uniform(5000, 75000) if acc_type == 'Investment' else random.uniform(1000, 25000), 2),
+			'balance': round(random.uniform(*balance_range), 2),
 			'currency': 'USD',
 			'status': 'active',
 			'created_at': created_at.isoformat()
@@ -57,7 +185,7 @@ def get_or_create_accounts(user_id: str) -> list:
 	return accounts
 
 
-def get_or_create_cards(user_id: str) -> list:
+def get_or_create_cards(user_id: str, wealth_context: WealthContext) -> list:
 	"""Get existing cards or create new ones with FAILSAFE
 	
 	Failsafe: Checks existing cards first. Creates realistic cards with staggered dates.
@@ -71,8 +199,8 @@ def get_or_create_cards(user_id: str) -> list:
 	
 	print("No cards found. Creating new ones...")
 	card_configs = [
-		('Credit', 'Cartier', 50000, 720),  # Oldest card, 2 years old
-		('Credit', 'Van Cleef & Arpels', 35000, 365),  # 1 year old
+		('Credit', 'Cartier', wealth_context.config['card_limits']['Credit'], 720),  # Oldest card, 2 years old
+		('Credit', 'Van Cleef & Arpels', wealth_context.config['card_limits']['Credit'] * 0.7, 365),  # 1 year old
 		('Debit', 'Montblanc', 0, 90)  # Newest, 3 months old
 	]
 	cards = []
@@ -101,7 +229,7 @@ def get_or_create_cards(user_id: str) -> list:
 	return cards
 
 
-def seed_realistic_transactions(accounts: list, months: int) -> None:
+def seed_realistic_transactions(accounts: list, months: int, wealth_context: WealthContext) -> None:
 	"""Generate realistic transaction patterns with proper distribution
 	
 	Creates transactions that look real: more recent activity, periodic payments,
@@ -146,32 +274,32 @@ def seed_realistic_transactions(accounts: list, months: int) -> None:
 				if random.random() < 0.6 and acc_type == 'Checking':
 					merchant = 'Salary Deposit'
 					description = f'Monthly salary deposit - {fake.company()}'
-					amount = round(random.uniform(5000, 15000), 2)
+					amount = round(random.uniform(*wealth_context.config['salary_range']), 2)
 					category = 'Income'
 				else:
 					merchant = 'Transfer In'
 					description = f'Funds transfer from {fake.company()}'
-					amount = round(random.uniform(100, 5000), 2)
+					amount = round(random.uniform(*wealth_context.config['transfer_range']), 2)
 					category = 'Transfer'
 			else:
 				# Debits: spending
-				is_luxury = random.random() < 0.15
+				is_luxury = random.random() < wealth_context.config['luxury_frequency']
 				is_utility = random.random() < 0.1
 				
 				if is_utility:
 					merchant = random.choice(utilities)
 					description = f'Utility payment - {merchant}'
-					amount = round(random.uniform(50, 300), 2)
+					amount = round(random.uniform(*wealth_context.config['utility_range']), 2)
 					category = 'Utilities'
 				elif is_luxury:
 					merchant = random.choice(luxury_merchants)
 					description = f'Purchase at {merchant}'
-					amount = round(random.uniform(800, 8000), 2)
+					amount = round(random.uniform(*wealth_context.config['luxury_transaction_range']), 2)
 					category = random.choice(['Jewelry', 'Travel', 'Shopping'])
 				else:
 					merchant = random.choice(regular_merchants)
 					description = f'Purchase at {merchant}'
-					amount = round(random.uniform(5, 500), 2)
+					amount = round(random.uniform(*wealth_context.config['regular_transaction_range']), 2)
 					category = random.choice(['Dining', 'Shopping', 'Entertainment', 'Groceries'])
 			
 			transaction_data = {
@@ -226,7 +354,7 @@ def seed_bills(user_id: str) -> None:
 	print(f"  Created {len(bill_types)} bill payees")
 
 
-def seed_checks(user_id: str, accounts: list) -> None:
+def seed_checks(user_id: str, accounts: list, wealth_context: WealthContext) -> None:
 	"""Create check records with FAILSAFE"""
 	# Check existing
 	existing = supabase.table('checks').select('*').eq('user_id', user_id).execute()
@@ -243,10 +371,13 @@ def seed_checks(user_id: str, accounts: list) -> None:
 		days_ago = random.randint(5, 180)
 		status = 'cleared' if days_ago > 7 else random.choice(['cleared', 'pending'])
 		
+		# Scale check amounts based on wealth context
+		check_range = wealth_context.config['transfer_range']
+		
 		check_data = {
 			'user_id': user_id,
 			'account_id': random.choice(accounts)['id'],
-			'amount': round(random.uniform(100, 5000), 2),
+			'amount': round(random.uniform(*check_range), 2),
 			'check_number': str(1001 + i),
 			'payee': fake.company(),
 			'status': status,
@@ -258,7 +389,7 @@ def seed_checks(user_id: str, accounts: list) -> None:
 	print(f"  Created {num_checks} check records")
 
 
-def seed_notifications(user_id: str, months: int) -> None:
+def seed_notifications(user_id: str, months: int, wealth_context: WealthContext) -> None:
 	"""Create notification history with FAILSAFE"""
 	# Check existing
 	existing = supabase.table('notifications').select('*').eq('user_id', user_id).execute()
@@ -285,9 +416,12 @@ def seed_notifications(user_id: str, months: int) -> None:
 	for _ in range(num_notifications):
 		notif_type, title_template, message_template = random.choice(notification_templates)
 		
-		# Make messages more realistic
+		# Make messages more realistic based on wealth context
+		max_notification_amount = int(wealth_context.config['luxury_transaction_range'][1] * 0.8)
+		min_notification_amount = int(wealth_context.config['regular_transaction_range'][1])
+		
 		message = message_template.format(
-			amount=random.randint(100, 5000),
+			amount=random.randint(min_notification_amount, max_notification_amount),
 			brand=random.choice(['Cartier', 'Van Cleef & Arpels', 'Montblanc']),
 			payee=random.choice(['Electric Company', 'Internet Provider']),
 			account_type=random.choice(['Checking', 'Savings']),
@@ -321,6 +455,9 @@ def main():
 	parser.add_argument('--email', help='User email address')
 	parser.add_argument('--months', type=int, default=6, help='Months of history (2-12)')
 	parser.add_argument('--list-users', action='store_true', help='List all users in database')
+	parser.add_argument('--wealth-context', choices=['modest', 'standard', 'affluent', 'wealthy', 'ultra'], 
+					   default='standard', help='Wealth context for transaction magnitudes')
+	parser.add_argument('--target-balance', type=float, help='Target total balance (overrides wealth-context default)')
 	
 	args = parser.parse_args()
 	
@@ -354,6 +491,17 @@ def main():
 	if args.months < 2 or args.months > 12:
 		print("ERROR: Months must be between 2 and 12")
 		sys.exit(1)
+	
+	if args.target_balance is not None and args.target_balance <= 0:
+		print("ERROR: Target balance must be greater than 0")
+		sys.exit(1)
+	
+	# Show wealth context info
+	if args.target_balance:
+		print(f"Custom target balance: ${args.target_balance:,.2f}")
+	else:
+		default_balance = WealthContext(args.wealth_context)._get_default_balance(args.wealth_context)
+		print(f"Wealth context '{args.wealth_context}' with default target: ${default_balance:,.2f}")
 	
 	print(f"\n{'='*60}")
 	print(f"CONCIERGE BANK - DATA SEEDER")
@@ -391,15 +539,24 @@ def main():
 		print(f"ID: {user_id}")
 		print(f"Name: {user.get('full_name', 'N/A')}")
 		print(f"Role: {user.get('role', 'user')}")
+		print(f"Wealth Context: {args.wealth_context}")
+		if args.target_balance:
+			print(f"Target Balance: ${args.target_balance:,.2f}")
 		print(f"History: {args.months} months\n")
 		
+		# Initialize wealth context
+		wealth_context = WealthContext(args.wealth_context, args.target_balance)
+		print(f"Context Configuration: {wealth_context.context_type}")
+		print(f"Expected Range: ${wealth_context._get_default_balance(args.wealth_context):,.2f} default balance")
+		print()
+		
 		# Seed with failsafes
-		accounts = get_or_create_accounts(user_id)
-		cards = get_or_create_cards(user_id)
-		seed_realistic_transactions(accounts, args.months)
+		accounts = get_or_create_accounts(user_id, wealth_context)
+		cards = get_or_create_cards(user_id, wealth_context)
+		seed_realistic_transactions(accounts, args.months, wealth_context)
 		seed_bills(user_id)
-		seed_checks(user_id, accounts)
-		seed_notifications(user_id, args.months)
+		seed_checks(user_id, accounts, wealth_context)
+		seed_notifications(user_id, args.months, wealth_context)
 		
 		print(f"\n{'='*60}")
 		print("✅ SEEDING COMPLETE")

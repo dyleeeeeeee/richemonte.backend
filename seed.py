@@ -229,11 +229,12 @@ def get_or_create_cards(user_id: str, wealth_context: WealthContext) -> list:
 	return cards
 
 
-def seed_realistic_transactions(accounts: list, months: int, wealth_context: WealthContext) -> None:
+def seed_realistic_transactions(accounts: list, months: int, wealth_context: WealthContext, scale_factor: float = 1.0) -> None:
 	"""Generate realistic transaction patterns with proper distribution
 	
 	Creates transactions that look real: more recent activity, periodic payments,
 	salary deposits, realistic spending patterns.
+	Applies scale_factor to all transaction amounts to match target balance.
 	"""
 	luxury_merchants = [
 		'Cartier Boutique', 'Van Cleef & Arpels', 'Montblanc Store',
@@ -274,12 +275,14 @@ def seed_realistic_transactions(accounts: list, months: int, wealth_context: Wea
 				if random.random() < 0.6 and acc_type == 'Checking':
 					merchant = 'Salary Deposit'
 					description = f'Monthly salary deposit - {fake.company()}'
-					amount = round(random.uniform(*wealth_context.config['salary_range']), 2)
+					salary_range = wealth_context.get_scaled_range(wealth_context.config['salary_range'], scale_factor)
+					amount = round(random.uniform(*salary_range), 2)
 					category = 'Income'
 				else:
 					merchant = 'Transfer In'
 					description = f'Funds transfer from {fake.company()}'
-					amount = round(random.uniform(*wealth_context.config['transfer_range']), 2)
+					transfer_range = wealth_context.get_scaled_range(wealth_context.config['transfer_range'], scale_factor)
+					amount = round(random.uniform(*transfer_range), 2)
 					category = 'Transfer'
 			else:
 				# Debits: spending
@@ -289,17 +292,20 @@ def seed_realistic_transactions(accounts: list, months: int, wealth_context: Wea
 				if is_utility:
 					merchant = random.choice(utilities)
 					description = f'Utility payment - {merchant}'
-					amount = round(random.uniform(*wealth_context.config['utility_range']), 2)
+					utility_range = wealth_context.get_scaled_range(wealth_context.config['utility_range'], scale_factor)
+					amount = round(random.uniform(*utility_range), 2)
 					category = 'Utilities'
 				elif is_luxury:
 					merchant = random.choice(luxury_merchants)
 					description = f'Purchase at {merchant}'
-					amount = round(random.uniform(*wealth_context.config['luxury_transaction_range']), 2)
+					luxury_range = wealth_context.get_scaled_range(wealth_context.config['luxury_transaction_range'], scale_factor)
+					amount = round(random.uniform(*luxury_range), 2)
 					category = random.choice(['Jewelry', 'Travel', 'Shopping'])
 				else:
 					merchant = random.choice(regular_merchants)
 					description = f'Purchase at {merchant}'
-					amount = round(random.uniform(*wealth_context.config['regular_transaction_range']), 2)
+					regular_range = wealth_context.get_scaled_range(wealth_context.config['regular_transaction_range'], scale_factor)
+					amount = round(random.uniform(*regular_range), 2)
 					category = random.choice(['Dining', 'Shopping', 'Entertainment', 'Groceries'])
 			
 			transaction_data = {
@@ -354,7 +360,7 @@ def seed_bills(user_id: str) -> None:
 	print(f"  Created {len(bill_types)} bill payees")
 
 
-def seed_checks(user_id: str, accounts: list, wealth_context: WealthContext) -> None:
+def seed_checks(user_id: str, accounts: list, wealth_context: WealthContext, scale_factor: float = 1.0) -> None:
 	"""Create check records with FAILSAFE"""
 	# Check existing
 	existing = supabase.table('checks').select('*').eq('user_id', user_id).execute()
@@ -371,8 +377,8 @@ def seed_checks(user_id: str, accounts: list, wealth_context: WealthContext) -> 
 		days_ago = random.randint(5, 180)
 		status = 'cleared' if days_ago > 7 else random.choice(['cleared', 'pending'])
 		
-		# Scale check amounts based on wealth context
-		check_range = wealth_context.config['transfer_range']
+		# Scale check amounts based on wealth context and target balance
+		check_range = wealth_context.get_scaled_range(wealth_context.config['transfer_range'], scale_factor)
 		
 		check_data = {
 			'user_id': user_id,
@@ -389,7 +395,7 @@ def seed_checks(user_id: str, accounts: list, wealth_context: WealthContext) -> 
 	print(f"  Created {num_checks} check records")
 
 
-def seed_notifications(user_id: str, months: int, wealth_context: WealthContext) -> None:
+def seed_notifications(user_id: str, months: int, wealth_context: WealthContext, scale_factor: float = 1.0) -> None:
 	"""Create notification history with FAILSAFE"""
 	# Check existing
 	existing = supabase.table('notifications').select('*').eq('user_id', user_id).execute()
@@ -416,9 +422,11 @@ def seed_notifications(user_id: str, months: int, wealth_context: WealthContext)
 	for _ in range(num_notifications):
 		notif_type, title_template, message_template = random.choice(notification_templates)
 		
-		# Make messages more realistic based on wealth context
-		max_notification_amount = int(wealth_context.config['luxury_transaction_range'][1] * 0.8)
-		min_notification_amount = int(wealth_context.config['regular_transaction_range'][1])
+		# Make messages more realistic based on wealth context and target balance
+		luxury_range = wealth_context.get_scaled_range(wealth_context.config['luxury_transaction_range'], scale_factor)
+		regular_range = wealth_context.get_scaled_range(wealth_context.config['regular_transaction_range'], scale_factor)
+		max_notification_amount = int(luxury_range[1] * 0.8)
+		min_notification_amount = int(regular_range[1])
 		
 		message = message_template.format(
 			amount=random.randint(min_notification_amount, max_notification_amount),
@@ -550,13 +558,17 @@ def main():
 		print(f"Expected Range: ${wealth_context._get_default_balance(args.wealth_context):,.2f} default balance")
 		print()
 		
+		# Calculate scaling factor to reach target balance
+		estimated_total = sum(rng[1] for rng in wealth_context.config['account_balance_ranges'].values())
+		scale_factor = wealth_context.scale_to_target(estimated_total)
+		
 		# Seed with failsafes
 		accounts = get_or_create_accounts(user_id, wealth_context)
 		cards = get_or_create_cards(user_id, wealth_context)
-		seed_realistic_transactions(accounts, args.months, wealth_context)
+		seed_realistic_transactions(accounts, args.months, wealth_context, scale_factor)
 		seed_bills(user_id)
-		seed_checks(user_id, accounts, wealth_context)
-		seed_notifications(user_id, args.months, wealth_context)
+		seed_checks(user_id, accounts, wealth_context, scale_factor)
+		seed_notifications(user_id, args.months, wealth_context, scale_factor)
 		
 		print(f"\n{'='*60}")
 		print("✅ SEEDING COMPLETE")

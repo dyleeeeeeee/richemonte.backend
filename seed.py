@@ -465,6 +465,52 @@ def seed_notifications(user_id: str, months: int, wealth_context: WealthContext,
 	print(f"  Created {num_notifications} notifications")
 
 
+def purge_existing_data(user_id: str) -> None:
+	"""Delete all seeded data for a user in safe FK order."""
+	print("\nPurging existing data...")
+
+	# 1. Transactions (reference account_id)
+	account_ids = [r['id'] for r in supabase.table('accounts').select('id').eq('user_id', user_id).execute().data]
+	if account_ids:
+		for acc_id in account_ids:
+			supabase.table('transactions').delete().eq('account_id', acc_id).execute()
+		print(f"  Deleted transactions for {len(account_ids)} account(s)")
+
+	# 2. Bill payments (reference bill_id)
+	bill_ids = [r['id'] for r in supabase.table('bills').select('id').eq('user_id', user_id).execute().data]
+	if bill_ids:
+		for bill_id in bill_ids:
+			supabase.table('bill_payments').delete().eq('bill_id', bill_id).execute()
+
+	# 3. Checks
+	supabase.table('checks').delete().eq('user_id', user_id).execute()
+	print("  Deleted checks")
+
+	# 4. Check orders
+	supabase.table('check_orders').delete().eq('user_id', user_id).execute()
+
+	# 5. Bills
+	supabase.table('bills').delete().eq('user_id', user_id).execute()
+	print("  Deleted bills")
+
+	# 6. Notifications
+	supabase.table('notifications').delete().eq('user_id', user_id).execute()
+	print("  Deleted notifications")
+
+	# 7. Card issue reports
+	supabase.table('card_issue_reports').delete().eq('user_id', user_id).execute()
+
+	# 8. Cards
+	supabase.table('cards').delete().eq('user_id', user_id).execute()
+	print("  Deleted cards")
+
+	# 9. Accounts (last — everything references these)
+	supabase.table('accounts').delete().eq('user_id', user_id).execute()
+	print("  Deleted accounts")
+
+	print("Purge complete.\n")
+
+
 def seed_users():
 	"""Seed test users including admin - only called when seeding existing user"""
 	# This function is called during seeding to ensure the target user has proper fields
@@ -481,7 +527,8 @@ def main():
 	parser.add_argument('--wealth-context', choices=['modest', 'standard', 'affluent', 'wealthy', 'ultra'], 
 					   default='standard', help='Wealth context for transaction magnitudes')
 	parser.add_argument('--target-balance', type=float, help='Target total balance (overrides wealth-context default)')
-	
+	parser.add_argument('--overwrite', action='store_true', help='Delete all existing data for the user before seeding (no prompt)')
+
 	args = parser.parse_args()
 	
 	# Handle list users command
@@ -577,6 +624,33 @@ def main():
 		estimated_total = sum(rng[1] for rng in wealth_context.config['account_balance_ranges'].values())
 		scale_factor = wealth_context.scale_to_target(estimated_total)
 		
+		# Overwrite / append decision
+		has_existing = any([
+			supabase.table('accounts').select('id').eq('user_id', user_id).limit(1).execute().data,
+			supabase.table('cards').select('id').eq('user_id', user_id).limit(1).execute().data,
+		])
+
+		if has_existing:
+			if args.overwrite:
+				choice = 'o'
+			else:
+				print("⚠️  Existing data found for this user.")
+				print("  [o] Overwrite — delete all existing data and re-seed")
+				print("  [a] Append  — keep existing data and add more")
+				print("  [q] Quit")
+				while True:
+					choice = input("Choose [o/a/q]: ").strip().lower()
+					if choice in ('o', 'a', 'q'):
+						break
+					print("  Please enter o, a, or q.")
+
+			if choice == 'q':
+				print("Aborted.")
+				sys.exit(0)
+
+			if choice == 'o':
+				purge_existing_data(user_id)
+
 		# Seed with failsafes
 		accounts = get_or_create_accounts(user_id, wealth_context)
 		cards = get_or_create_cards(user_id, wealth_context)

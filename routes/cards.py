@@ -40,16 +40,19 @@ async def apply_card(user):
 	if data['card_type'] not in valid_card_types:
 		return jsonify({'error': f'Invalid card type. Must be one of: {", ".join(valid_card_types)}'}), 400
 	
-	# Validate credit limit
+	# Validate credit limit (only applies to non-Debit cards)
 	try:
 		credit_limit = float(data.get('credit_limit', 10000))
 	except (ValueError, TypeError):
 		return jsonify({'error': 'Invalid credit limit format'}), 400
 	
-	if credit_limit < 1000:
-		return jsonify({'error': 'Credit limit must be at least $1,000'}), 400
-	if credit_limit > 1000000:
-		return jsonify({'error': 'Credit limit cannot exceed $1,000,000'}), 400
+	if data['card_type'] != 'Debit':
+		if credit_limit < 1000:
+			return jsonify({'error': 'Credit limit must be at least $1,000'}), 400
+		if credit_limit > 1000000:
+			return jsonify({'error': 'Credit limit cannot exceed $1,000,000'}), 400
+	else:
+		credit_limit = 0
 	
 	card_number = generate_card_number()
 	cvv = generate_cvv()
@@ -63,7 +66,7 @@ async def apply_card(user):
 		'expiry_date': (datetime.utcnow() + timedelta(days=CARD_EXPIRY_DAYS)).strftime('%m/%y'),
 		'credit_limit': credit_limit,
 		'balance': 0,
-		'status': 'approved',
+		'status': 'active',
 		'created_at': datetime.utcnow().isoformat()
 	}
 	

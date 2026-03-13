@@ -29,10 +29,11 @@ async def update_settings(user):
 	"""Update user settings"""
 	data = await request.get_json()
 	
-	# Add updated_at timestamp
-	data['updated_at'] = datetime.utcnow().isoformat()
+	allowed_fields = ['full_name', 'phone', 'address', 'preferred_brand', 'photo_url', 'notification_preferences']
+	update_data = {k: v for k, v in data.items() if k in allowed_fields}
+	update_data['updated_at'] = datetime.utcnow().isoformat()
 	
-	result = supabase.table('users').update(data).eq('id', user['user_id']).execute()
+	result = supabase.table('users').update(update_data).eq('id', user['user_id']).execute()
 	logger.info(f"Settings updated for user {user['user_id']}")
 	return jsonify(result.data[0])
 

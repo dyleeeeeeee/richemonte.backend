@@ -7,6 +7,7 @@ from quart import Blueprint, request, jsonify
 
 from core import get_supabase_client
 from auth import require_auth, require_transactions_enabled
+from utils import verify_account_ownership, update_account_balance, create_transaction_record
 from services import notify_user
 from templates import check_deposit_email, check_order_email
 
@@ -71,7 +72,6 @@ async def deposit_check(user):
 		return jsonify({'error': 'Check amount exceeds maximum limit of $100,000'}), 400
 	
 	# Verify account ownership
-	from utils import verify_account_ownership, update_account_balance, create_transaction_record
 	success, account_data, error = await verify_account_ownership(supabase, data['account_id'], user['user_id'])
 	if not success:
 		return jsonify({'error': error}), 400
@@ -127,7 +127,6 @@ async def order_checks(user):
 		return jsonify({'error': 'Account ID is required'}), 400
 	
 	# Verify account ownership
-	from utils import verify_account_ownership
 	success, account_data, error = await verify_account_ownership(supabase, data['account_id'], user['user_id'])
 	if not success:
 		return jsonify({'error': error}), 400
@@ -150,7 +149,6 @@ async def order_checks(user):
 		'account_id': data['account_id'],
 		'design': data.get('design', 'Standard'),
 		'quantity': quantity,
-		'price': float(data.get('price', 29.99)),
 		'status': 'processing',
 		'created_at': datetime.utcnow().isoformat()
 	}

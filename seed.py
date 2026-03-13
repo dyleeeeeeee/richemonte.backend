@@ -168,11 +168,17 @@ def get_or_create_accounts(user_id: str, wealth_context: WealthContext) -> list:
 			scale_factor
 		)
 		
+		# Distribute target balance proportionally: each account gets its share based on range midpoint
+		range_midpoints = {t: sum(wealth_context.config['account_balance_ranges'][t]) / 2 for t in account_types}
+		total_midpoints = sum(range_midpoints.values())
+		account_share = range_midpoints[acc_type] / total_midpoints
+		target_for_account = round(wealth_context.target_balance * account_share, 2)
+		
 		account_data = {
 			'user_id': user_id,
 			'account_number': generate_account_number(),
 			'account_type': acc_type,
-			'balance': round(random.uniform(*balance_range), 2),
+			'balance': target_for_account,
 			'currency': 'USD',
 			'status': 'active',
 			'created_at': created_at.isoformat()
@@ -180,7 +186,7 @@ def get_or_create_accounts(user_id: str, wealth_context: WealthContext) -> list:
 		
 		result = supabase.table('accounts').insert(account_data).execute()
 		accounts.append(result.data[0])
-		print(f"  Created {acc_type} account (opened {days_ago} days ago): {account_data['account_number']}")
+		print(f"  Created {acc_type} account (opened {days_ago} days ago): {account_data['account_number']} | Balance: ${target_for_account:,.2f}")
 	
 	return accounts
 
@@ -337,8 +343,8 @@ def seed_bills(user_id: str) -> None:
 	bill_types = [
 		('Con Edison Electric', 'utility'),
 		('NYC Water & Sewer', 'utility'),
-		('Verizon Fios', 'telecom'),
-		('AT&T Wireless', 'telecom'),
+		('Verizon Fios', 'other'),
+		('AT&T Wireless', 'other'),
 		('Chase Sapphire Reserve', 'credit_card'),
 		('State Farm Insurance', 'insurance')
 	]
@@ -436,9 +442,18 @@ def seed_notifications(user_id: str, months: int, wealth_context: WealthContext,
 			location='New York, NY'
 		)
 		
+		title = title_template.format(
+			amount=random.randint(min_notification_amount, max_notification_amount),
+			brand=random.choice(['Cartier', 'Van Cleef & Arpels', 'Montblanc']),
+			payee=random.choice(['Electric Company', 'Internet Provider']),
+			account_type=random.choice(['Checking', 'Savings']),
+			location='New York, NY'
+		)
+		
 		notification_data = {
 			'user_id': user_id,
 			'type': notif_type,
+			'title': title,
 			'message': message,
 			'delivery_method': 'push',  # Default to push notifications
 			'read': random.choice([True, False]),

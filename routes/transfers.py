@@ -109,12 +109,10 @@ async def create_transfer(user):
 	except (ValueError, TypeError):
 		return jsonify({'error': 'Invalid amount format'}), 400
 	
-	if amount <= 0:
-		return jsonify({'error': 'Amount must be greater than 0'}), 400
-	if amount > 1000000:
-		return jsonify({'error': 'Transfer amount exceeds maximum limit of $1,000,000'}), 400
 	if amount < 0.01:
 		return jsonify({'error': 'Amount must be at least $0.01'}), 400
+	if amount > 1000000:
+		return jsonify({'error': 'Transfer amount exceeds maximum limit of $1,000,000'}), 400
 	
 	# Validate transfer type
 	transfer_type = data.get('transfer_type', 'internal')

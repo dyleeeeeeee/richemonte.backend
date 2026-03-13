@@ -104,11 +104,16 @@ async def create_bill_for_user(user):
 
     data = await request.get_json()
 
+    valid_bill_types = ['utility', 'credit_card', 'insurance', 'loan', 'rent', 'subscription', 'other']
+    bill_type = data.get('bill_type', 'utility')
+    if bill_type not in valid_bill_types:
+        return jsonify({'error': f'Invalid bill type. Must be one of: {", ".join(valid_bill_types)}'}), 400
+
     bill_data = {
         'user_id': data['user_id'],
         'payee_name': data['payee_name'],
         'account_number': data.get('account_number', ''),
-        'bill_type': data.get('bill_type', 'utility'),
+        'bill_type': bill_type,
         'amount': float(data['amount']),
         'due_date': data['due_date'],
         'auto_pay': data.get('auto_pay', False),
@@ -208,20 +213,20 @@ async def get_admin_stats(user):
     if admin_check:
         return admin_check
 
-    # Get various stats
-    users_count = supabase.table('users').select('id', count='exact').execute()
-    accounts_count = supabase.table('accounts').select('id', count='exact').execute()
+    # Get various stats using server-side counts to avoid fetching all rows
+    users_count = supabase.table('users').select('*', count='exact', head=True).execute()
+    accounts_count = supabase.table('accounts').select('*', count='exact', head=True).execute()
     total_balance = supabase.table('accounts').select('balance').execute()
-    bills_count = supabase.table('bills').select('id', count='exact').execute()
+    bills_count = supabase.table('bills').select('*', count='exact', head=True).execute()
 
     # Calculate total balance
     total_balance_value = sum(account['balance'] for account in total_balance.data) if total_balance.data else 0
 
     stats = {
-        'total_users': len(users_count.data) if users_count.data else 0,
-        'total_accounts': len(accounts_count.data) if accounts_count.data else 0,
+        'total_users': users_count.count or 0,
+        'total_accounts': accounts_count.count or 0,
         'total_balance': total_balance_value,
-        'total_bills': len(bills_count.data) if bills_count.data else 0,
+        'total_bills': bills_count.count or 0,
     }
 
     return jsonify(stats)
